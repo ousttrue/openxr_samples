@@ -13,11 +13,21 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 #
+cmake_minimum_required(VERSION 3.6.0)
+project(native-activity VERSION 0.1.0)
 
 #
-# native-activity as a shared lib
+# native_app_glue as a static lib
 #
-set(TARGET_NAME native-activity)
-add_library(${TARGET_NAME} SHARED main.cpp)
-target_compile_options(${TARGET_NAME} PRIVATE -std=gnu++11 -Wall -Werror)
-target_link_libraries(${TARGET_NAME} android EGL GLESv1_CM log native_app_glue)
+set(TARGET_NAME native_app_glue)
+add_library(
+  ${TARGET_NAME} STATIC
+  ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
+target_include_directories(
+  ${TARGET_NAME} PUBLIC ${ANDROID_NDK}/sources/android/native_app_glue)
+
+# Export ANativeActivity_onCreate(), Refer to:
+# https://github.com/android-ndk/ndk/issues/381.
+target_link_options(${TARGET_NAME} PUBLIC -u ANativeActivity_onCreate)
+
+subdirs(src/main/cpp)

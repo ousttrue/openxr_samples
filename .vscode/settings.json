@@ -1,0 +1,14 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/native-activity/app",
+    "cmake.configureSettings": {
+        "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.0.6113669/build/cmake/android.toolchain.cmake",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ANDROID_PLATFORM": "android-23",
+        "ANDROID_ABI": "arm64-v8a",
+        "CMAKE_ANDROID_ARCH_ABI": "arm64-v8a",
+    },
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build"
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic",
+}
