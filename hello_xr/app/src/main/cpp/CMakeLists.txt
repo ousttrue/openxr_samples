@@ -31,26 +31,37 @@ add_library(
   graphicsplugin_opengles.cpp
   ${VULKAN_SHADERS})
 # set_target_properties(${TARGET_NAME} PROPERTIES FOLDER ${SAMPLES_FOLDER})
+target_link_libraries(${TARGET_NAME} openxr_loader)
+target_link_options(${TARGET_NAME} PUBLIC -u ANativeActivity_onCreate)
 
 compile_glsl(run_hello_xr_glsl_compiles ${VULKAN_SHADERS})
-add_dependencies(${TARGET_NAME} generate_openxr_header run_hello_xr_glsl_compiles)
+# add_dependencies(${TARGET_NAME} generate_openxr_header
+# run_hello_xr_glsl_compiles)
 
 target_include_directories(
   ${TARGET_NAME}
-  PRIVATE # For including compiled shaders
-          ${CMAKE_CURRENT_BINARY_DIR}
-  # ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/common # for OpenXR
-  # headers ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include # for
-  # helper headers ${PROJECT_SOURCE_DIR}/external/include
+  PRIVATE
+    # For including compiled shaders
+    ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/OpenXR-SDK-Source/src
+    # ${PROJECT_SOURCE_DIR}/src/common # for OpenXR headers
+    # ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include # for helper
+    # headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/OpenXR-SDK-Source/external/include
 )
 
-add_compile_definitions(${TARGET_NAME} PRIVATE XR_USE_PLATFORM_ANDROID)
+add_compile_definitions(${TARGET_NAME} PRIVATE XR_USE_PLATFORM_ANDROID
+                        XR_USE_GRAPHICS_API_OPENGL_ES)
 if(GLSLANG_VALIDATOR AND NOT GLSLC_COMMAND)
   target_compile_definitions(${TARGET_NAME} PRIVATE USE_GLSLANGVALIDATOR)
 endif()
 
-if(TARGET openxr-gfxwrapper)
-  target_link_libraries(${TARGET_NAME} openxr-gfxwrapper)
-endif()
-target_link_libraries(${TARGET_NAME} openxr_loader ${ANDROID_LIBRARY}
-                      ${ANDROID_LOG_LIBRARY} android_native_app_glue)
+target_link_libraries(
+  ${TARGET_NAME}
+  android
+  log
+  android_native_app_glue
+  openxr_loader
+  GLESv3
+  EGL
+  openxr-gfxwrapper)

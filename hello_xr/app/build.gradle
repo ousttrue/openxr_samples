@@ -22,9 +22,9 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments '-DANDROID_STL=c++_shared'
+                // arguments '-DANDROID_STL=c++_shared'
                 cppFlags '-DDEFAULT_GRAPHICS_PLUGIN_OPENGLES'
-                // targets 'openxr_loader', 'hello_xr'
+                // targets 'hello_xr'
             }
         }
     }
