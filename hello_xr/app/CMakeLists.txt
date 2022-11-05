@@ -40,14 +40,12 @@ target_include_directories(${TARGET_NAME}
 # openxr_loader
 #
 # include(${CMAKE_CURRENT_LIST_DIR}/../../third_party/openxr.cmake)
-add_library(openxr_loader SHARED IMPORTED)
-set_target_properties(
-  openxr_loader
-  PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${OPENXR_SDK_DIR}/include
-    IMPORTED_LOCATION
-    ${MOBILE_SDK_DIR}/OpenXR/Libs/Android/${ANDROID_ABI}/Release/libopenxr_loader.so
-)
+# add_library(openxr_loader SHARED IMPORTED) set_target_properties(
+# openxr_loader PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+# ${OPENXR_SDK_DIR}/include IMPORTED_LOCATION
+# ${MOBILE_SDK_DIR}/OpenXR/Libs/Android/${ANDROID_ABI}/Release/libopenxr_loader.so
+# )
+subdirs(${OPENXR_SDK_DIR})
 
 set(HELPER_FOLDER "Helpers")
 function(compile_glsl run_target_name)

@@ -10,5 +10,6 @@ libwebp
 **/ndkHelperBin
 **/.cxx
 display-p3/third_party
+.cache
 
 OpenXRMobileSDK

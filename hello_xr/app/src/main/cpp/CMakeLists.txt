@@ -31,7 +31,7 @@ add_library(
   graphicsplugin_opengles.cpp
   ${VULKAN_SHADERS})
 # set_target_properties(${TARGET_NAME} PROPERTIES FOLDER ${SAMPLES_FOLDER})
-target_link_libraries(${TARGET_NAME} openxr_loader)
+# target_link_libraries(${TARGET_NAME} openxr_loader)
 target_link_options(${TARGET_NAME} PUBLIC -u ANativeActivity_onCreate)
 
 compile_glsl(run_hello_xr_glsl_compiles ${VULKAN_SHADERS})
@@ -44,6 +44,7 @@ target_include_directories(
     # For including compiled shaders
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/OpenXR-SDK-Source/src
+    # ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/OpenXR-SDK/include
     # ${PROJECT_SOURCE_DIR}/src/common # for OpenXR headers
     # ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include # for helper
     # headers
