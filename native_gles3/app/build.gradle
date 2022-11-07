@@ -1,0 +1,23 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 28
+    ndkVersion '22.1.7171670'
+
+    namespace 'com.ousttrue.native_gles3'
+    defaultConfig {
+        applicationId = 'com.ousttrue.native_gles3'
+        minSdkVersion 26
+        targetSdkVersion 26
+        externalNativeBuild {
+            cmake {
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+}
