@@ -13,3 +13,6 @@ display-p3/third_party
 .cache
 
 OpenXRMobileSDK
+gradle/
+gradlew
+gradlew.bat

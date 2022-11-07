@@ -21,3 +21,7 @@ copy from OpenXRMobileSDK/XrSamples/XrHandsFB
 
 * simple build.gradle
 * simple CMake
+
+## gl2tri3dOXR
+
+copy from https://github.com/terryky/android_openxr_gles/tree/main/gl2tri3dOXR
