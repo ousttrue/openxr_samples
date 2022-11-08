@@ -40,7 +40,7 @@ private:
   XrSpace m_appSpace;
   XrSpace m_stageSpace;
   XrSystemId m_systemId;
-  std::vector<viewsurface_t> m_viewSurface;
+  std::vector<viewsurface> m_viewSurface;
 
   std::vector<XrView> m_views;
   std::vector<XrCompositionLayerProjectionView> m_projLayerViews;

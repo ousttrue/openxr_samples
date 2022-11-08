@@ -358,28 +358,17 @@ oxr_alloc_swapchain_rtargets(XrSwapchain swapchain, uint32_t width,
     }
     rtarget_array.push_back(rtarget);
     LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
-         imgCnt, rtarget.fbo_id, rtarget.texc_id, rtarget.texz_id, width, height);
+         imgCnt, rtarget.fbo_id, rtarget.texc_id, rtarget.texz_id, width,
+         height);
   }
   free(img_gles);
   return 0;
 }
 
-static uint32_t oxr_acquire_swapchain_img(XrSwapchain swapchain) {
-  uint32_t imgIdx;
-  XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-  xrAcquireSwapchainImage(swapchain, &acquireInfo, &imgIdx);
-
-  XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-  waitInfo.timeout = XR_INFINITE_DURATION;
-  xrWaitSwapchainImage(swapchain, &waitInfo);
-
-  return imgIdx;
-}
-
-std::vector<viewsurface_t> oxr_create_viewsurface(XrInstance instance,
-                                                  XrSystemId sysid,
-                                                  XrSession session) {
-  std::vector<viewsurface_t> sfcArray;
+std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
+                                                XrSystemId sysid,
+                                                XrSession session) {
+  std::vector<viewsurface> sfcArray;
 
   uint32_t viewCount;
   XrViewConfigurationView *conf_views =
@@ -393,7 +382,7 @@ std::vector<viewsurface_t> oxr_create_viewsurface(XrInstance instance,
     LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i, vp_w, vp_h,
          vp.recommendedSwapchainSampleCount);
 
-    viewsurface_t sfc;
+    viewsurface sfc;
     sfc.width = vp_w;
     sfc.height = vp_h;
     sfc.swapchain = oxr_create_swapchain(session, sfc.width, sfc.height);
@@ -404,29 +393,6 @@ std::vector<viewsurface_t> oxr_create_viewsurface(XrInstance instance,
   }
 
   return sfcArray;
-}
-
-int oxr_acquire_viewsurface(viewsurface_t &viewSurface,
-                            render_target_t &rtarget,
-                            XrSwapchainSubImage &subImg) {
-  subImg.swapchain = viewSurface.swapchain;
-  subImg.imageRect.offset.x = 0;
-  subImg.imageRect.offset.y = 0;
-  subImg.imageRect.extent.width = viewSurface.width;
-  subImg.imageRect.extent.height = viewSurface.height;
-  subImg.imageArrayIndex = 0;
-
-  uint32_t imgIdx = oxr_acquire_swapchain_img(viewSurface.swapchain);
-  rtarget = viewSurface.rtarget_array[imgIdx];
-
-  return 0;
-}
-
-int oxr_release_viewsurface(viewsurface_t &viewSurface) {
-  XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-  xrReleaseSwapchainImage(viewSurface.swapchain, &releaseInfo);
-
-  return 0;
 }
 
 /* ----------------------------------------------------------------------------
