@@ -28,6 +28,15 @@ MAKE_TO_STRING_FUNC(XrFormFactor);
 
 static XrInstance s_instance = XR_NULL_HANDLE;
 
+uint32_t viewsurface::getSwapchainIndex()const
+{
+  uint32_t imgIdx;
+  XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+  xrAcquireSwapchainImage(swapchain, &acquireInfo, &imgIdx);
+  return imgIdx;
+}
+
+
 /* ----------------------------------------------------------------------------
  * * Initialize OpenXR Loader
  * ----------------------------------------------------------------------------

@@ -29,6 +29,8 @@ struct viewsurface {
   uint32_t height;
   XrSwapchain swapchain;
   std::vector<std::shared_ptr<render_target>> rtarget_array;
+
+  uint32_t getSwapchainIndex()const;
 };
 
 /* Initialize OpenXR Loader */

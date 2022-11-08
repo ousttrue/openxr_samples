@@ -31,7 +31,7 @@ public:
 
   void RenderLayer(const FrameInfo &frame, int i, const RenderFunc &func);
   void EndFrame(XrTime dpy_time);
-
+  uint32_t SwapchainIndex()const;
 private:
   struct android_app *m_app;
 

@@ -104,14 +104,11 @@ void AppEngine::RenderLayer(const FrameInfo &frame, int i,
   subImg.imageArrayIndex = 0;
   m_projLayerViews[i].subImage = subImg;
 
-  // uint32_t imgIdx = oxr_acquire_swapchain_img(m_viewSurface[i].swapchain);
-  uint32_t imgIdx;
-  XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-  xrAcquireSwapchainImage(m_viewSurface[i].swapchain, &acquireInfo, &imgIdx);
 
   XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
   waitInfo.timeout = XR_INFINITE_DURATION;
   xrWaitSwapchainImage(m_viewSurface[i].swapchain, &waitInfo);
+  auto imgIdx = m_viewSurface[i].getSwapchainIndex();
   auto rtarget = m_viewSurface[i].rtarget_array[imgIdx];
   func(m_projLayerViews[i], *rtarget, frame.stageLoc.pose);
 
