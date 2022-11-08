@@ -1,8 +1,8 @@
 #include "app_engine.h"
 #include "openxr/openxr.h"
-#include "render_scene.h"
 #include "util_egl.h"
 #include "util_oxr.h"
+#include <stdint.h>
 
 AppEngine::AppEngine(android_app *app) : m_app(app) {}
 
@@ -29,9 +29,9 @@ void AppEngine::InitOpenXR_GLES() {
 
   egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
   oxr_confirm_gfx_requirements(m_instance, m_systemId);
+}
 
-  init_gles_scene();
-
+void AppEngine::CreateSession() {
   m_session = oxr_create_session(m_instance, m_systemId);
   m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
   m_stageSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
@@ -43,42 +43,34 @@ void AppEngine::InitOpenXR_GLES() {
  * * Update  Frame (Event handle, Render)
  * ------------------------------------------------------------------------------------
  */
-void AppEngine::UpdateFrame() {
+bool AppEngine::UpdateFrame() {
   bool exit_loop, req_restart;
   oxr_poll_events(m_instance, m_session, &exit_loop, &req_restart);
-
   if (!oxr_is_session_running()) {
-    return;
+    return false;
   }
-
-  auto dpy_time = BeginFrame();
-  /* Acquire Stage Location (rerative to the View Location) */
-  XrSpaceLocation stageLoc{XR_TYPE_SPACE_LOCATION};
-  xrLocateSpace(m_stageSpace, m_appSpace, dpy_time, &stageLoc);
-
-  for (int i = 0; i < m_views.size(); ++i) {
-    RenderLayer(dpy_time, stageLoc, i, m_projLayerViews[i], m_views[i]);
-  }
-  EndFrame(dpy_time);
+  return true;
 }
 
 /* ------------------------------------------------------------------------------------
  * * RenderFrame (Frame/Layer/View)
  * ------------------------------------------------------------------------------------
  */
-XrTime AppEngine::BeginFrame() {
-  XrTime dpy_time;
-  oxr_begin_frame(m_session, &dpy_time);
+void AppEngine::BeginFrame(FrameInfo *frame) {
+  oxr_begin_frame(m_session, &frame->time);
 
   /* Acquire View Location */
-  uint32_t viewCount = (uint32_t)m_viewSurface.size();
-  m_views.resize(viewCount);
-  oxr_locate_views(m_session, dpy_time, m_appSpace, &viewCount,
+  frame->viewCount = (uint32_t)m_viewSurface.size();
+  m_views.resize(frame->viewCount);
+
+  oxr_locate_views(m_session, frame->time, m_appSpace, &frame->viewCount,
                    m_views.data());
 
-  m_projLayerViews.resize(viewCount);
+  m_projLayerViews.resize(frame->viewCount);
 
-  return dpy_time;
+  /* Acquire Stage Location (rerative to the View Location) */
+  frame->stageLoc = {XR_TYPE_SPACE_LOCATION};
+  xrLocateSpace(m_stageSpace, m_appSpace, frame->time, &frame->stageLoc);
 }
 
 void AppEngine::EndFrame(XrTime dpy_time) {
@@ -96,21 +88,20 @@ void AppEngine::EndFrame(XrTime dpy_time) {
   oxr_end_frame(m_session, dpy_time, all_layers);
 }
 
-void AppEngine::RenderLayer(XrTime dpy_time, XrSpaceLocation &stageLoc, int i,
-                            XrCompositionLayerProjectionView &layerView,
-                            XrView &view) {
+void AppEngine::RenderLayer(const FrameInfo &frame, int i,
+                            const RenderFunc &func) {
 
   /* Render each view */
   XrSwapchainSubImage subImg;
   render_target_t rtarget;
   oxr_acquire_viewsurface(m_viewSurface[i], rtarget, subImg);
 
-  layerView = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-  layerView.pose = view.pose;
-  layerView.fov = view.fov;
-  layerView.subImage = subImg;
+  m_projLayerViews[i] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
+  m_projLayerViews[i].pose = m_views[i].pose;
+  m_projLayerViews[i].fov = m_views[i].fov;
+  m_projLayerViews[i].subImage = subImg;
 
-  render_gles_scene(layerView, rtarget, stageLoc.pose, i);
+  func(m_projLayerViews[i], rtarget, frame.stageLoc.pose);
 
   oxr_release_viewsurface(m_viewSurface[i]);
 }
