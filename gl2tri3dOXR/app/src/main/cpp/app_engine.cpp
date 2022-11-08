@@ -51,50 +51,42 @@ void AppEngine::UpdateFrame() {
     return;
   }
 
-  std::vector<XrView> views;
-  std::vector<XrCompositionLayerProjectionView> projLayerViews;
-  XrTime dpy_time;
-  auto viewCount = BeginFrame(&dpy_time, projLayerViews, views);
+  auto dpy_time = BeginFrame();
   /* Acquire Stage Location (rerative to the View Location) */
   XrSpaceLocation stageLoc{XR_TYPE_SPACE_LOCATION};
   xrLocateSpace(m_stageSpace, m_appSpace, dpy_time, &stageLoc);
 
-  for (int i = 0; i < viewCount; ++i) {
-    RenderLayer(dpy_time, stageLoc, i, projLayerViews[i], views[i]);
+  for (int i = 0; i < m_views.size(); ++i) {
+    RenderLayer(dpy_time, stageLoc, i, m_projLayerViews[i], m_views[i]);
   }
-  std::vector<XrCompositionLayerBaseHeader *> all_layers;
-  EndFrame(dpy_time, projLayerViews);
+  EndFrame(dpy_time);
 }
 
 /* ------------------------------------------------------------------------------------
  * * RenderFrame (Frame/Layer/View)
  * ------------------------------------------------------------------------------------
  */
-int AppEngine::BeginFrame(
-    XrTime *dpy_time,
-    std::vector<XrCompositionLayerProjectionView> &projLayerViews,
-    std::vector<XrView> &views) {
-  oxr_begin_frame(m_session, dpy_time);
+XrTime AppEngine::BeginFrame() {
+  XrTime dpy_time;
+  oxr_begin_frame(m_session, &dpy_time);
 
   /* Acquire View Location */
   uint32_t viewCount = (uint32_t)m_viewSurface.size();
+  m_views.resize(viewCount);
+  oxr_locate_views(m_session, dpy_time, m_appSpace, &viewCount,
+                   m_views.data());
 
-  views.resize(viewCount);
-  oxr_locate_views(m_session, *dpy_time, m_appSpace, &viewCount, views.data());
+  m_projLayerViews.resize(viewCount);
 
-  projLayerViews.resize(viewCount);
-
-  return viewCount;
+  return dpy_time;
 }
 
-void AppEngine::EndFrame(
-    XrTime dpy_time,
-    std::vector<XrCompositionLayerProjectionView> &projLayerViews) {
+void AppEngine::EndFrame(XrTime dpy_time) {
   XrCompositionLayerProjection projLayer;
   projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
   projLayer.space = m_appSpace;
-  projLayer.viewCount = (uint32_t)projLayerViews.size();
-  projLayer.views = projLayerViews.data();
+  projLayer.viewCount = (uint32_t)m_projLayerViews.size();
+  projLayer.views = m_projLayerViews.data();
 
   std::vector<XrCompositionLayerBaseHeader *> all_layers;
   all_layers.push_back(

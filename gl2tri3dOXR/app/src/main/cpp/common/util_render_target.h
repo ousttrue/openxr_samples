@@ -4,7 +4,7 @@
  * ------------------------------------------------ */
 #ifndef UTIL_RENDER_TARGET_H
 #define UTIL_RENDER_TARGET_H
-
+#include <GLES/gl.h>
 
 #define RTARGET_DEFAULT     (0 << 0)
 #define RTARGET_COLOR       (1 << 0)

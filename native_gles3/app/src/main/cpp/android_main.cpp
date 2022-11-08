@@ -5,12 +5,48 @@
 #include <android_native_app_glue.h>
 #include <assert.h>
 
-static void onAppCmd(android_app *state, int32_t cmd) {
+struct AndroidAppState {
+  ANativeWindow *NativeWindow = nullptr;
+  bool Resumed = false;
+};
+
+static void ProcessAndroidCmd(struct android_app *app, int32_t cmd) {
+  AndroidAppState *appState = (AndroidAppState *)app->userData;
+
   switch (cmd) {
-  case APP_CMD_INIT_WINDOW:
+  case APP_CMD_START:
+    LOGI("APP_CMD_START");
     break;
 
+  case APP_CMD_RESUME:
+    LOGI("APP_CMD_RESUME");
+    appState->Resumed = true;
+    break;
+
+  case APP_CMD_PAUSE:
+    LOGI("APP_CMD_PAUSE");
+    appState->Resumed = false;
+    break;
+
+  case APP_CMD_STOP:
+    LOGI("APP_CMD_STOP");
+    break;
+
+  case APP_CMD_DESTROY:
+    LOGI("APP_CMD_DESTROY");
+    appState->NativeWindow = NULL;
+    break;
+
+  // The window is being shown, get it ready.
+  case APP_CMD_INIT_WINDOW:
+    LOGI("APP_CMD_INIT_WINDOW");
+    appState->NativeWindow = app->window;
+    break;
+
+  // The window is being hidden or closed, clean it up.
   case APP_CMD_TERM_WINDOW:
+    LOGI("APP_CMD_TERM_WINDOW");
+    appState->NativeWindow = NULL;
     break;
   }
 }
@@ -22,8 +58,9 @@ static void onAppCmd(android_app *state, int32_t cmd) {
  */
 void android_main(struct android_app *state) {
 
-  // state->userData = this;
-  state->onAppCmd = onAppCmd;
+  AndroidAppState appState = {};
+  state->userData = &appState;
+  state->onAppCmd = ProcessAndroidCmd;
 
   // instance
   OpenXRApp oxr;
@@ -47,25 +84,31 @@ void android_main(struct android_app *state) {
   // session
   oxr.createSession();
 
-  // space
-  // view
-
-  while (true) {
+  while (state->destroyRequested == 0) {
+    // Read all pending events.
     while (true) {
       int events;
-      android_poll_source *source;
-      auto ident = ALooper_pollAll(0, nullptr, &events, (void **)&source);
-      {
-        if (ident < 0) {
-          break;
-        }
+      struct android_poll_source *source;
+
+      int timeout = -1; // blocking
+      if (appState.Resumed || oxr.isSessionRunning() ||
+          state->destroyRequested) {
+        timeout = 0; // non blocking
       }
-      if (source) {
+
+      if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {
+        break;
+      }
+
+      if (source != nullptr) {
         source->process(state, source);
       }
-      if (state->destroyRequested != 0) {
-        return;
-      }
     }
+
+    auto time = oxr.beginFrame();
+    for (auto &view : oxr.viewSwapchains_) {
+      // renderer.renderView(view.swapchain);
+    }
+    oxr.endFrame(time);
   }
 }

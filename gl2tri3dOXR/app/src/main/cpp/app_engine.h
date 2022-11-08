@@ -1,5 +1,6 @@
 #pragma once
 
+#include "openxr/openxr.h"
 #include "util_egl.h"
 #include "util_oxr.h"
 
@@ -23,14 +24,13 @@ private:
   XrSpace m_stageSpace;
   XrSystemId m_systemId;
   std::vector<viewsurface_t> m_viewSurface;
+  std::vector<XrView> m_views;
+  std::vector<XrCompositionLayerProjectionView> m_projLayerViews;
 
-  int BeginFrame(XrTime *dpy_time,
-                 std::vector<XrCompositionLayerProjectionView> &projLayerViews,
-                 std::vector<XrView> &views);
+  XrTime BeginFrame();
   void RenderLayer(XrTime dpy_time, XrSpaceLocation &stageLoc, int i,
                    XrCompositionLayerProjectionView &layerView, XrView &view);
-  void EndFrame(XrTime dpy_time,
-                std::vector<XrCompositionLayerProjectionView> &projLayerViews);
+  void EndFrame(XrTime dpy_time);
 
 public:
 };
