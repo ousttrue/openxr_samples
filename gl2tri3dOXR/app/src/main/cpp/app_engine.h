@@ -6,17 +6,35 @@
 #include <functional>
 #include <stdint.h>
 
-struct FrameInfo {
-  bool isRunning;
-  XrTime time;
-  XrSpaceLocation stageLoc;
-  uint32_t viewCount;
-};
-
 using RenderFunc =
     std::function<int(XrCompositionLayerProjectionView &layerView,
                       render_target &rtarget, const XrPosef &stagePose)>;
+
+struct viewsurface {
+  XrSwapchain swapchain;
+  uint32_t width;
+  uint32_t height;
+
+  XrView view;
+  XrCompositionLayerProjectionView projLayerView;
+
+  std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const;
+  uint32_t acquireSwapchain();
+  void releaseSwapchain() const;
+};
+
 class AppEngine {
+  struct android_app *m_app;
+
+  XrInstance m_instance;
+  XrSession m_session;
+  XrSpace m_appSpace;
+  XrSpace m_stageSpace;
+  XrSystemId m_systemId;
+  std::vector<viewsurface> m_viewSurface;
+
+  XrTime m_displayTime;
+
 public:
   explicit AppEngine(android_app *app);
   ~AppEngine();
@@ -27,25 +45,10 @@ public:
   void InitOpenXR_GLES();
   void CreateSession();
   bool UpdateFrame();
-  void BeginFrame(FrameInfo *frame);
-
-  void RenderLayer(const FrameInfo &frame, int i, const RenderFunc &func);
-  void EndFrame(XrTime dpy_time);
-  uint32_t SwapchainIndex()const;
-private:
-  struct android_app *m_app;
-
-  XrInstance m_instance;
-  XrSession m_session;
-  XrSpace m_appSpace;
-  XrSpace m_stageSpace;
-  XrSystemId m_systemId;
-  std::vector<viewsurface> m_viewSurface;
-
-  std::vector<XrView> m_views;
-  std::vector<XrCompositionLayerProjectionView> m_projLayerViews;
-
-public:
+  bool BeginFrame(XrPosef *stagePose);
+  viewsurface *GetView(size_t i);
+  void EndFrame();
+  uint32_t SwapchainIndex() const;
 };
 
 AppEngine *GetAppEngine(void);

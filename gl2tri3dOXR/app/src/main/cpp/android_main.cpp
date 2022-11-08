@@ -1,4 +1,5 @@
 #include "app_engine.h"
+#include "openxr/openxr.h"
 #include "render_scene.h"
 
 struct AndroidAppState {
@@ -63,6 +64,22 @@ void android_main(struct android_app *app) {
 
   engine.CreateSession();
 
+  // create backbuffer
+  for (int i = 0;; ++i) {
+    auto view = engine.GetView(i);
+    if (!view) {
+      break;
+    }
+    auto img_gles = view->getSwapchainImages();
+    for (uint32_t j = 0; j < img_gles.size(); j++) {
+      GLuint tex_c = img_gles[j].image;
+      if (!renderer.createBackbuffer(i, j, tex_c, view->width, view->height)) {
+        LOGE("createBackbuffer");
+        return;
+      }
+    }
+  }
+
   while (app->destroyRequested == 0) {
     // Read all pending events.
     for (;;) {
@@ -83,15 +100,26 @@ void android_main(struct android_app *app) {
     }
 
     if (engine.UpdateFrame()) {
-      FrameInfo frame;
-      engine.BeginFrame(&frame);
-      auto f = std::bind(&Renderer::render_gles_scene, &renderer,
-                         std::placeholders::_1, std::placeholders::_2,
-                         std::placeholders::_3);
-      for (int i = 0; i < frame.viewCount; ++i) {
-        engine.RenderLayer(frame, i, f);
+      XrPosef stagePose;
+      if (engine.BeginFrame(&stagePose)) {
+        for (int i = 0;; ++i) {
+          auto view = engine.GetView(i);
+          if (!view) {
+            break;
+          }
+          auto swapchainIndex = view->acquireSwapchain();
+
+          int x = view->projLayerView.subImage.imageRect.offset.x;
+          int y = view->projLayerView.subImage.imageRect.offset.y;
+          int w = view->projLayerView.subImage.imageRect.extent.width;
+          int h = view->projLayerView.subImage.imageRect.extent.height;
+          renderer.render_gles_scene(i, swapchainIndex, x, y, w, h,
+                                     view->projLayerView.fov,
+                                     view->projLayerView.pose, stagePose);
+          view->releaseSwapchain();
+        }
+        engine.EndFrame();
       }
-      engine.EndFrame(frame.time);
     }
   }
 }

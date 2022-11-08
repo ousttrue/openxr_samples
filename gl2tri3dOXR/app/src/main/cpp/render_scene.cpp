@@ -5,6 +5,7 @@
 #include "util_oxr.h"
 #include <GLES3/gl31.h>
 #include <common/xr_linear.h>
+#include <stdint.h>
 
 static GLfloat s_vtx[] = {
     -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f,
@@ -113,17 +114,18 @@ int Renderer::draw_triangle(float *matStage) {
   return 0;
 }
 
-int Renderer::render_gles_scene(XrCompositionLayerProjectionView &layerView,
-                                render_target &rtarget,
+int Renderer::render_gles_scene(size_t viewIndex, size_t swapchainIndex, int x,
+                                int y, int width, int height, const XrFovf &fov,
+                                const XrPosef &viewPose,
                                 const XrPosef &stagePose) {
-  int view_x = layerView.subImage.imageRect.offset.x;
-  int view_y = layerView.subImage.imageRect.offset.y;
-  int view_w = layerView.subImage.imageRect.extent.width;
-  int view_h = layerView.subImage.imageRect.extent.height;
 
-  glBindFramebuffer(GL_FRAMEBUFFER, rtarget.fbo_id);
+  auto fbo = getFBO(viewIndex, swapchainIndex);
+  if (!fbo) {
+    return -1;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-  glViewport(view_x, view_y, view_w, view_h);
+  glViewport(x, y, width, height);
 
   glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -136,12 +138,12 @@ int Renderer::render_gles_scene(XrCompositionLayerProjectionView &layerView,
   XrMatrix4x4f matP, matV, matC, matM, matPV, matPVM;
 
   /* Projection Matrix */
-  XrMatrix4x4f_CreateProjectionFov(&matP, GRAPHICS_OPENGL_ES, layerView.fov,
-                                   0.05f, 100.0f);
+  XrMatrix4x4f_CreateProjectionFov(&matP, GRAPHICS_OPENGL_ES, fov, 0.05f,
+                                   100.0f);
 
   /* View Matrix (inverse of Camera matrix) */
   XrVector3f scale = {1.0f, 1.0f, 1.0f};
-  const auto &vewPose = layerView.pose;
+  const auto &vewPose = viewPose;
   XrMatrix4x4f_CreateTranslationRotationScale(&matC, &vewPose.position,
                                               &vewPose.orientation, &scale);
   XrMatrix4x4f_InvertRigidBody(&matV, &matC);
@@ -161,32 +163,93 @@ int Renderer::render_gles_scene(XrCompositionLayerProjectionView &layerView,
   draw_stage(matStage);
   draw_triangle(matStage);
 
-  {
-    XrVector3f &pos = layerView.pose.position;
-    XrQuaternionf &rot = layerView.pose.orientation;
-    XrFovf &fov = layerView.fov;
-    int x = 100;
-    int y = 100;
-    char strbuf[128];
+  //   {
+  //     XrVector3f &pos = layerView.pose.position;
+  //     XrQuaternionf &rot = layerView.pose.orientation;
+  //     XrFovf &fov = layerView.fov;
+  //     int x = 100;
+  //     int y = 100;
+  //     char strbuf[128];
 
-    update_dbgstr_winsize(view_w, view_h);
+  //     update_dbgstr_winsize(view_w, view_h);
 
-    sprintf(strbuf, "VIEWPOS(%6.4f, %6.4f, %6.4f)", pos.x, pos.y, pos.z);
-    draw_dbgstr(strbuf, x, y);
-    y += 22;
+  //     sprintf(strbuf, "VIEWPOS(%6.4f, %6.4f, %6.4f)", pos.x, pos.y, pos.z);
+  //     draw_dbgstr(strbuf, x, y);
+  //     y += 22;
 
-    sprintf(strbuf, "VIEWROT(%6.4f, %6.4f, %6.4f, %6.4f)", rot.x, rot.y, rot.z,
-            rot.w);
-    draw_dbgstr(strbuf, x, y);
-    y += 22;
+  //     sprintf(strbuf, "VIEWROT(%6.4f, %6.4f, %6.4f, %6.4f)", rot.x, rot.y,
+  //     rot.z,
+  //             rot.w);
+  //     draw_dbgstr(strbuf, x, y);
+  //     y += 22;
 
-    sprintf(strbuf, "VIEWFOV(%6.4f, %6.4f, %6.4f, %6.4f)", fov.angleLeft,
-            fov.angleRight, fov.angleUp, fov.angleDown);
-    draw_dbgstr(strbuf, x, y);
-    y += 22;
-  }
+  //     sprintf(strbuf, "VIEWFOV(%6.4f, %6.4f, %6.4f, %6.4f)", fov.angleLeft,
+  //             fov.angleRight, fov.angleUp, fov.angleDown);
+  //     draw_dbgstr(strbuf, x, y);
+  //     y += 22;
+  //   }
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   return 0;
+}
+
+uint32_t Renderer::getFBO(size_t viewIndex, size_t swapchainIndex) const {
+  if (viewIndex >= swapchains.size()) {
+    return 0;
+  }
+  auto &view = swapchains[viewIndex];
+  if (swapchainIndex >= view.rtarget_array.size()) {
+    return 0;
+  }
+  return view.rtarget_array[swapchainIndex]->fbo_id;
+}
+
+//   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
+//        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
+//        sfc.width, sfc.height);
+
+bool Renderer::createBackbuffer(size_t viewIndex, size_t swapchainIndex,
+                                uint32_t tex_c, int width, int height) {
+  /* Depth Buffer */
+  GLuint tex_z = 0;
+  glGenRenderbuffers(1, &tex_z);
+  glBindRenderbuffer(GL_RENDERBUFFER, tex_z);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+
+  /* FBO */
+  GLuint fbo = 0;
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         tex_c, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_RENDERBUFFER, tex_z);
+
+  GLenum stat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if (stat != GL_FRAMEBUFFER_COMPLETE) {
+    LOGE("FBO Imcomplete");
+    return false;
+  }
+  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  auto rtarget = std::make_shared<render_target>();
+  rtarget->texc_id = tex_c;
+  rtarget->texz_id = tex_z;
+  rtarget->fbo_id = fbo;
+  rtarget->width = width;
+  rtarget->height = height;
+
+  if (viewIndex >= swapchains.size()) {
+    swapchains.resize(viewIndex + 1);
+  }
+  auto view = &swapchains[viewIndex];
+
+  if (swapchainIndex >= view->rtarget_array.size()) {
+    view->rtarget_array.resize(swapchainIndex + 1);
+  }
+  view->rtarget_array[swapchainIndex] = rtarget;
+
+  return true;
 }

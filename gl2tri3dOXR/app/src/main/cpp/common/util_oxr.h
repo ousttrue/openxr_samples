@@ -24,15 +24,6 @@
 #include "util_log.h"
 #include "util_render_target.h"
 
-struct viewsurface {
-  uint32_t width;
-  uint32_t height;
-  XrSwapchain swapchain;
-  std::vector<std::shared_ptr<render_target>> rtarget_array;
-
-  uint32_t getSwapchainIndex()const;
-};
-
 /* Initialize OpenXR Loader */
 int oxr_initialize_loader(void *appVM, void *appCtx);
 
@@ -46,15 +37,6 @@ std::string oxr_get_system_name(XrInstance instance, XrSystemId sysid);
 
 /* Confirm OpenGLES version */
 int oxr_confirm_gfx_requirements(XrInstance instance, XrSystemId systemId);
-
-/* View operation */
-int oxr_locate_views(XrSession session, XrTime dpy_time, XrSpace space,
-                     uint32_t *view_cnt, XrView *view_array);
-
-/* Swapchain operation */
-std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
-                                                XrSystemId sysid,
-                                                XrSession session);
 
 /* Frame operation */
 int oxr_begin_frame(XrSession session, XrTime *dpyTime);
