@@ -15,7 +15,7 @@ struct FrameInfo {
 
 using RenderFunc =
     std::function<int(XrCompositionLayerProjectionView &layerView,
-                      render_target_t &rtarget, const XrPosef &stagePose)>;
+                      render_target &rtarget, const XrPosef &stagePose)>;
 class AppEngine {
 public:
   explicit AppEngine(android_app *app);

@@ -113,7 +113,7 @@ void AppEngine::RenderLayer(const FrameInfo &frame, int i,
   waitInfo.timeout = XR_INFINITE_DURATION;
   xrWaitSwapchainImage(m_viewSurface[i].swapchain, &waitInfo);
   auto rtarget = m_viewSurface[i].rtarget_array[imgIdx];
-  func(m_projLayerViews[i], rtarget, frame.stageLoc.pose);
+  func(m_projLayerViews[i], *rtarget, frame.stageLoc.pose);
 
   // oxr_release_viewsurface(m_viewSurface[i]);
   XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};

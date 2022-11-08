@@ -4,6 +4,7 @@
  * ------------------------------------------------ */
 #pragma once
 
+#include <memory>
 #ifdef __ANDROID__
 #include <android/native_window.h>
 #include <android_native_app_glue.h>
@@ -27,7 +28,7 @@ struct viewsurface {
   uint32_t width;
   uint32_t height;
   XrSwapchain swapchain;
-  std::vector<render_target_t> rtarget_array;
+  std::vector<std::shared_ptr<render_target>> rtarget_array;
 };
 
 /* Initialize OpenXR Loader */

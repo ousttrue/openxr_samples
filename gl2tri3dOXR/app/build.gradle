@@ -5,6 +5,7 @@ plugins {
 android {
     compileSdk 30
 
+    namespace "com.example.gl2tri3dOXR"
     defaultConfig {
         applicationId "com.example.gl2tri3dOXR"
         minSdk 24
@@ -36,7 +37,7 @@ android {
     }
     externalNativeBuild {
         cmake {
-            version '3.10.2'
+            version '3.22.1'
             path file('src/main/cpp/CMakeLists.txt')
         }
     }

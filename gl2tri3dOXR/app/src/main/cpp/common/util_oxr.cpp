@@ -300,9 +300,8 @@ static XrSwapchain oxr_create_swapchain(XrSession session, uint32_t width,
   return swapchain;
 }
 
-static bool tryCreateBackBuffer(GLuint tex_c, int width, int height,
-                                render_target_t *rtarget) {
-
+static std::shared_ptr<render_target> createBackBuffer(GLuint tex_c, int width,
+                                                       int height) {
   /* Depth Buffer */
   GLuint tex_z = 0;
   glGenRenderbuffers(1, &tex_z);
@@ -321,77 +320,72 @@ static bool tryCreateBackBuffer(GLuint tex_c, int width, int height,
   GLenum stat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   if (stat != GL_FRAMEBUFFER_COMPLETE) {
     LOGE("FBO Imcomplete");
-    return false;
+    return nullptr;
   }
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+  auto rtarget = std::make_shared<render_target>();
   rtarget->texc_id = tex_c;
   rtarget->texz_id = tex_z;
   rtarget->fbo_id = fbo;
   rtarget->width = width;
   rtarget->height = height;
-
-  return true;
+  return rtarget;
 }
 
-static int
-oxr_alloc_swapchain_rtargets(XrSwapchain swapchain, uint32_t width,
-                             uint32_t height,
-                             std::vector<render_target_t> &rtarget_array) {
+static viewsurface create_view(XrSession session,
+                               const XrViewConfigurationView &vp) {
+  viewsurface sfc;
+  sfc.width = vp.recommendedImageRectWidth;
+  sfc.height = vp.recommendedImageRectHeight;
+  sfc.swapchain = oxr_create_swapchain(session, sfc.width, sfc.height);
+
   uint32_t imgCnt;
-  xrEnumerateSwapchainImages(swapchain, 0, &imgCnt, NULL);
+  xrEnumerateSwapchainImages(sfc.swapchain, 0, &imgCnt, NULL);
 
-  XrSwapchainImageOpenGLESKHR *img_gles = (XrSwapchainImageOpenGLESKHR *)calloc(
-      sizeof(XrSwapchainImageOpenGLESKHR), imgCnt);
-  for (uint32_t i = 0; i < imgCnt; i++)
-    img_gles[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
+  {
+    XrSwapchainImageOpenGLESKHR *img_gles =
+        (XrSwapchainImageOpenGLESKHR *)calloc(
+            sizeof(XrSwapchainImageOpenGLESKHR), imgCnt);
+    for (uint32_t i = 0; i < imgCnt; i++)
+      img_gles[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
 
-  xrEnumerateSwapchainImages(swapchain, imgCnt, &imgCnt,
-                             (XrSwapchainImageBaseHeader *)img_gles);
-
-  for (uint32_t i = 0; i < imgCnt; i++) {
-    GLuint tex_c = img_gles[i].image;
-    render_target_t rtarget;
-    if (!tryCreateBackBuffer(tex_c, width, height, &rtarget)) {
-      return -1;
+    xrEnumerateSwapchainImages(sfc.swapchain, imgCnt, &imgCnt,
+                               (XrSwapchainImageBaseHeader *)img_gles);
+    for (uint32_t i = 0; i < imgCnt; i++) {
+      GLuint tex_c = img_gles[i].image;
+      if (auto rtarget = createBackBuffer(tex_c, sfc.width, sfc.height)) {
+        // return -1;
+        sfc.rtarget_array.push_back(rtarget);
+        LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
+             imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
+             sfc.width, sfc.height);
+      } else {
+        break;
+      }
     }
-    rtarget_array.push_back(rtarget);
-    LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
-         imgCnt, rtarget.fbo_id, rtarget.texc_id, rtarget.texz_id, width,
-         height);
+    free(img_gles);
   }
-  free(img_gles);
-  return 0;
+
+  return sfc;
 }
 
 std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
                                                 XrSystemId sysid,
                                                 XrSession session) {
-  std::vector<viewsurface> sfcArray;
-
   uint32_t viewCount;
   XrViewConfigurationView *conf_views =
       oxr_enumerate_viewconfig(instance, sysid, &viewCount);
 
+  std::vector<viewsurface> sfcArray;
   for (uint32_t i = 0; i < viewCount; i++) {
-    const XrViewConfigurationView &vp = conf_views[i];
-    uint32_t vp_w = vp.recommendedImageRectWidth;
-    uint32_t vp_h = vp.recommendedImageRectHeight;
-
-    LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i, vp_w, vp_h,
+    auto &vp = conf_views[i];
+    LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i,
+         vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
          vp.recommendedSwapchainSampleCount);
-
-    viewsurface sfc;
-    sfc.width = vp_w;
-    sfc.height = vp_h;
-    sfc.swapchain = oxr_create_swapchain(session, sfc.width, sfc.height);
-    oxr_alloc_swapchain_rtargets(sfc.swapchain, sfc.width, sfc.height,
-                                 sfc.rtarget_array);
-
-    sfcArray.push_back(sfc);
+    sfcArray.push_back(create_view(session, vp));
   }
-
   return sfcArray;
 }
 

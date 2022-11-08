@@ -4,4 +4,4 @@
 
 int init_gles_scene ();
 int render_gles_scene (XrCompositionLayerProjectionView &layerView,
-                       render_target_t &rtarget, const XrPosef &stagePose);
+                       render_target &rtarget, const XrPosef &stagePose);
