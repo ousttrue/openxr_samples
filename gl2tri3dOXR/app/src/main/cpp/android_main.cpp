@@ -57,7 +57,10 @@ void android_main(struct android_app *app) {
 
   AppEngine engine(app);
   engine.InitOpenXR_GLES();
-  init_gles_scene();
+
+  Renderer renderer;
+  renderer.init_gles_scene();
+
   engine.CreateSession();
 
   while (app->destroyRequested == 0) {
@@ -82,8 +85,11 @@ void android_main(struct android_app *app) {
     if (engine.UpdateFrame()) {
       FrameInfo frame;
       engine.BeginFrame(&frame);
+      auto f = std::bind(&Renderer::render_gles_scene, &renderer,
+                         std::placeholders::_1, std::placeholders::_2,
+                         std::placeholders::_3);
       for (int i = 0; i < frame.viewCount; ++i) {
-        engine.RenderLayer(frame, i, &render_gles_scene);
+        engine.RenderLayer(frame, i, f);
       }
       engine.EndFrame(frame.time);
     }
