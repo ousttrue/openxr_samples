@@ -1,5 +1,4 @@
-#include "Engine.h"
-// #include "OpenXRApp.h"
+#include "EventHandler.h"
 #include "android_logger.h"
 #include <android/sensor.h>
 #include <android_native_app_glue.h>
@@ -13,9 +12,8 @@ void android_main(struct android_app *state) {
 
   // OpenXRApp app(state);
 
-  engine e;
-  state->userData = &e;
-  state->onAppCmd = OnAppCmd;
+  EventHandler e;
+  e.bind(state);
 
   while (true) {
     while (true) {
