@@ -6,6 +6,7 @@
 class EventHandler {
   EGLDisplay display_ = 0;
   EGLSurface surface_ = 0;
+  EGLContext context_ = 0;
   EGLint width_ = 0;
   EGLint height_ = 0;
   class Renderer *renderer_ = nullptr;
@@ -20,5 +21,5 @@ public:
 
 private:
   void onAppCmd(struct android_app *state, int32_t cmd);
-  bool initEGL(struct android_app *state);
+  bool initEGL3(struct android_app *state);
 };
