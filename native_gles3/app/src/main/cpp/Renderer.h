@@ -8,5 +8,7 @@ class Renderer {
 public:
   Renderer();
   ~Renderer();
+  int major() const;
+  int minor() const;
   void draw(int width, int height);
 };

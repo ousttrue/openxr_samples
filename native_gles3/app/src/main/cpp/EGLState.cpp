@@ -1,47 +1,8 @@
-#include "EventHandler.h"
-#include "Renderer.h"
+#include "EGLState.h"
 #include "android_logger.h"
-#include <EGL/egl.h>
-#include <EGL/eglplatform.h>
 #include <android_native_app_glue.h>
-#include <assert.h>
-#include <memory>
 
-EventHandler::EventHandler() {}
-
-EventHandler::~EventHandler() {}
-
-void EventHandler::OnAppCmd(android_app *state, int32_t cmd) {
-  auto self = reinterpret_cast<EventHandler *>(state->userData);
-  self->onAppCmd(state, cmd);
-}
-
-void EventHandler::bind(android_app *state) {
-  state->userData = this;
-  state->onAppCmd = OnAppCmd;
-}
-
-void EventHandler::onAppCmd(android_app *state, int32_t cmd) {
-  switch (cmd) {
-  case APP_CMD_INIT_WINDOW:
-    if (!renderer_) {
-      initEGL3(state);
-      eglQuerySurface(display_, surface_, EGL_WIDTH, &width_);
-      eglQuerySurface(display_, surface_, EGL_HEIGHT, &height_);
-      renderer_ = new Renderer();
-    }
-    renderer_->draw(width_, height_);
-    eglSwapBuffers(this->display_, this->surface_);
-    break;
-
-  case APP_CMD_TERM_WINDOW:
-    delete renderer_;
-    renderer_ = nullptr;
-    break;
-  }
-}
-
-bool EventHandler::initEGL3(android_app *state) {
+bool EGLState::initialize(android_app *state) {
 
   display_ = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(display_, nullptr, nullptr);

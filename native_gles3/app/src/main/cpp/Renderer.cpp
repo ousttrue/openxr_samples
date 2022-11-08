@@ -1,6 +1,6 @@
 #include "Renderer.h"
 #include "android_logger.h"
-#include <GLES/gl.h>
+#include <GLES3/gl31.h>
 #include <initializer_list>
 
 const char gVertexShader[] = "attribute vec4 vPosition;\n"
@@ -50,6 +50,18 @@ Renderer::Renderer() {
 }
 
 Renderer::~Renderer() {}
+
+int Renderer::major() const {
+  GLint major;
+  glGetIntegerv(GL_MAJOR_VERSION, &major);
+  return major;
+}
+
+int Renderer::minor() const {
+  GLint minor;
+  glGetIntegerv(GL_MINOR_VERSION, &minor);
+  return minor;
+}
 
 void Renderer::draw(int width, int height) {
   glViewport(0, 0, width, height);

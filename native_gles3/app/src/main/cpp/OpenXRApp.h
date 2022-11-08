@@ -1,9 +1,16 @@
 #pragma once
+#include <openxr/openxr.h>
 
 class OpenXRApp {
-  class OpenXRAppImpl *impl_ = nullptr;
+
+  XrInstance instance = {0};
+  XrSystemId systemId = {0};
+  XrSession session = {0};
 
 public:
-  OpenXRApp(struct android_app *app);
+  OpenXRApp();
   ~OpenXRApp();
+  void createInstance(struct android_app *app);
+  bool confirmGLES(int major, int minor);
+  void createSession();
 };
