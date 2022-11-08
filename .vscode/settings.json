@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "${workspaceFolder}/native_gles3/app",
+    "cmake.sourceDirectory": "${workspaceFolder}/gl2tri3dOXR/app/src/main/cpp",
     "cmake.configureSettings": {
         // "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.0.6113669/build/cmake/android.toolchain.cmake",
         "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",        
