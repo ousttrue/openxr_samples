@@ -2,6 +2,8 @@
 #include "openxr/openxr.h"
 #include "util_egl.h"
 #include "util_oxr.h"
+#include "util_render_target.h"
+#include <memory>
 #include <stdint.h>
 
 std::vector<XrSwapchainImageOpenGLESKHR>
@@ -17,7 +19,18 @@ viewsurface::getSwapchainImages() const {
   return img_gles;
 }
 
-uint32_t viewsurface::acquireSwapchain() {
+void viewsurface::createBackbuffers()
+{
+    auto img_gles = getSwapchainImages();
+    for (uint32_t j = 0; j < img_gles.size(); j++) {
+      GLuint tex_c = img_gles[j].image;
+      auto render_target = render_target::create(tex_c, width, height);
+      assert(render_target);
+      backbuffers.push_back(render_target);
+    }
+}
+
+std::shared_ptr<render_target> viewsurface::acquireSwapchain() {
   projLayerView = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
   projLayerView.pose = view.pose;
   projLayerView.fov = view.fov;
@@ -38,7 +51,7 @@ uint32_t viewsurface::acquireSwapchain() {
   uint32_t imgIdx;
   XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
   xrAcquireSwapchainImage(swapchain, &acquireInfo, &imgIdx);
-  return imgIdx;
+  return backbuffers[imgIdx];
 }
 
 void viewsurface::releaseSwapchain() const {

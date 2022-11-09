@@ -5,13 +5,51 @@
 #include "util_render_target.h"
 #include "assertgl.h"
 #include "util_egl.h"
+#include "util_log.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <GLES3/gl31.h>
 #include <math.h>
+#include <memory>
 #include <stdio.h>
 #include <string.h>
 
 #define UNUSED(x) (void)(x)
+
+std::shared_ptr<render_target> render_target::create(uint32_t tex_c, int width,
+                                                     int height) {
+
+  /* Depth Buffer */
+  GLuint tex_z = 0;
+  glGenRenderbuffers(1, &tex_z);
+  glBindRenderbuffer(GL_RENDERBUFFER, tex_z);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+
+  /* FBO */
+  GLuint fbo = 0;
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         tex_c, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_RENDERBUFFER, tex_z);
+
+  GLenum stat = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if (stat != GL_FRAMEBUFFER_COMPLETE) {
+    LOGE("FBO Imcomplete");
+    return nullptr;
+  }
+  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  auto rtarget = std::make_shared<render_target>();
+  rtarget->texc_id = tex_c;
+  rtarget->texz_id = tex_z;
+  rtarget->fbo_id = fbo;
+  rtarget->width = width;
+  rtarget->height = height;
+  return rtarget;
+}
 
 int render_target::create_render_target(int w, int h, unsigned int flags) {
   /* texture for color */

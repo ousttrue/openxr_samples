@@ -4,6 +4,7 @@
  * ------------------------------------------------ */
 #ifndef SHADER_UTIL_H
 #define SHADER_UTIL_H
+#include <GLES/gl.h>
 
 struct uniform_info
 {

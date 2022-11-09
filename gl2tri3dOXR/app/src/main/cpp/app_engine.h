@@ -1,9 +1,10 @@
 #pragma once
-
 #include "openxr/openxr.h"
 #include "util_egl.h"
 #include "util_oxr.h"
+#include "util_render_target.h"
 #include <functional>
+#include <memory>
 #include <stdint.h>
 
 using RenderFunc =
@@ -18,8 +19,12 @@ struct viewsurface {
   XrView view;
   XrCompositionLayerProjectionView projLayerView;
 
+  std::vector<std::shared_ptr<render_target>> backbuffers;
+
   std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const;
-  uint32_t acquireSwapchain();
+  void createBackbuffers();
+
+  std::shared_ptr<render_target> acquireSwapchain();
   void releaseSwapchain() const;
 };
 

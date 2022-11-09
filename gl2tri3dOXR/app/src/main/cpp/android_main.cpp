@@ -70,14 +70,11 @@ void android_main(struct android_app *app) {
     if (!view) {
       break;
     }
-    auto img_gles = view->getSwapchainImages();
-    for (uint32_t j = 0; j < img_gles.size(); j++) {
-      GLuint tex_c = img_gles[j].image;
-      if (!renderer.createBackbuffer(i, j, tex_c, view->width, view->height)) {
-        LOGE("createBackbuffer");
-        return;
-      }
-    }
+
+    view->createBackbuffers();
+    //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
+    //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
+    //        sfc.width, sfc.height);
   }
 
   while (app->destroyRequested == 0) {
@@ -107,15 +104,15 @@ void android_main(struct android_app *app) {
           if (!view) {
             break;
           }
-          auto swapchainIndex = view->acquireSwapchain();
+          auto renderTarget = view->acquireSwapchain();
 
           int x = view->projLayerView.subImage.imageRect.offset.x;
           int y = view->projLayerView.subImage.imageRect.offset.y;
           int w = view->projLayerView.subImage.imageRect.extent.width;
           int h = view->projLayerView.subImage.imageRect.extent.height;
-          renderer.render_gles_scene(i, swapchainIndex, x, y, w, h,
+          renderer.render_gles_scene(stagePose, renderTarget->fbo_id, x, y, w, h,
                                      view->projLayerView.fov,
-                                     view->projLayerView.pose, stagePose);
+                                     view->projLayerView.pose);
           view->releaseSwapchain();
         }
         engine.EndFrame();

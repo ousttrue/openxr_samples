@@ -4,6 +4,7 @@
  * ------------------------------------------------ */
 #pragma once
 #include <GLES/gl.h>
+#include <memory>
 
 #define RTARGET_DEFAULT (0 << 0)
 #define RTARGET_COLOR (1 << 0)
@@ -15,6 +16,8 @@ struct render_target {
   GLuint fbo_id = 0;
   int width = 0;
   int height = 0;
+  static std::shared_ptr<render_target> create(uint32_t tex_c, int width,
+                                               int height);
 
   int create_render_target(int w, int h, unsigned int flags);
   int destroy_render_target();
