@@ -2,7 +2,6 @@
 #include "util_debugstr.h"
 #include "util_egl.h"
 #include "util_matrix.h"
-#include "util_oxr.h"
 #include <GLES3/gl31.h>
 #include <common/xr_linear.h>
 #include <stdint.h>

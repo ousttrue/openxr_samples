@@ -53,16 +53,12 @@ set_property(
 # ------------------------------------------------------------------------
 # openxr_app
 # ------------------------------------------------------------------------
-
-file(GLOB LOCAL_HEADERS "*.h")
-file(GLOB LOCAL_SOURCE "*.cpp")
-
 add_library(
   openxr_app SHARED
-  ${LOCAL_SOURCE}
-  ${LOCAL_HEADERS}
+  android_main.cpp
+  app_engine.cpp
+  render_scene.cpp
   common/util_egl.c
-  common/util_oxr.cpp
   common/util_shader.c
   common/util_matrix.c
   common/util_debugstr.c

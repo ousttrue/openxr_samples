@@ -1,6 +1,7 @@
 #include "app_engine.h"
 #include "openxr/openxr.h"
 #include "render_scene.h"
+#include "util_log.h"
 
 struct AndroidAppState {
   ANativeWindow *NativeWindow = nullptr;
@@ -84,7 +85,7 @@ void android_main(struct android_app *app) {
       struct android_poll_source *source;
 
       int timeout = -1; // blocking
-      if (appState.Resumed || oxr_is_session_running() || app->destroyRequested)
+      if (appState.Resumed || engine.oxr_is_session_running() || app->destroyRequested)
         timeout = 0; // non blocking
 
       if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {
