@@ -104,20 +104,8 @@ struct viewsurface {
  * * Frame operation
  * ----------------------------------------------------------------------------
  */
-static int oxr_begin_frame(XrSession session, XrTime *dpy_time) {
-  XrFrameWaitInfo frameWait = {XR_TYPE_FRAME_WAIT_INFO};
-  XrFrameState frameState = {XR_TYPE_FRAME_STATE};
-  xrWaitFrame(session, &frameWait, &frameState);
-
-  XrFrameBeginInfo frameBegin = {XR_TYPE_FRAME_BEGIN_INFO};
-  xrBeginFrame(session, &frameBegin);
-
-  *dpy_time = frameState.predictedDisplayTime;
-  return (int)frameState.shouldRender;
-}
-
 static int oxr_end_frame(XrSession session, XrTime dpy_time,
-                  std::vector<XrCompositionLayerBaseHeader *> &layers) {
+                         std::vector<XrCompositionLayerBaseHeader *> &layers) {
   XrFrameEndInfo frameEnd{XR_TYPE_FRAME_END_INFO};
   frameEnd.displayTime = dpy_time;
   frameEnd.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
@@ -133,7 +121,7 @@ static int oxr_end_frame(XrSession session, XrTime dpy_time,
  * ----------------------------------------------------------------------------
  */
 static XrSpace oxr_create_ref_space(XrSession session,
-                             XrReferenceSpaceType ref_space_type) {
+                                    XrReferenceSpaceType ref_space_type) {
   XrSpace space;
   XrReferenceSpaceCreateInfo ci = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
   ci.referenceSpaceType = ref_space_type;
@@ -614,9 +602,17 @@ struct XrAppImpl {
   }
 
   bool BeginFrame(XrPosef *stagePose) {
-    oxr_begin_frame(m_session, &m_displayTime);
+    XrFrameWaitInfo frameWait = {XR_TYPE_FRAME_WAIT_INFO};
+    XrFrameState frameState = {XR_TYPE_FRAME_STATE};
+    xrWaitFrame(m_session, &frameWait, &frameState);
+    XrFrameBeginInfo frameBegin = {XR_TYPE_FRAME_BEGIN_INFO};
+    xrBeginFrame(m_session, &frameBegin);
+    m_displayTime = frameState.predictedDisplayTime;
+    if (!frameState.shouldRender) {
+      return false;
+    }
 
-    /* Acquire View Location */
+    // Acquire View Location
     std::vector<XrView> views(m_viewSurface.size());
 
     if (!oxr_locate_views(m_session, m_displayTime, m_appSpace, views.size(),
