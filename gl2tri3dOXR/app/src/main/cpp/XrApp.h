@@ -18,9 +18,9 @@
 #include <stdint.h>
 #include <vector>
 
-using RenderFunc =
-    std::function<int(XrCompositionLayerProjectionView &layerView,
-                      render_target &rtarget, const XrPosef &stagePose)>;
+using RenderFunc = std::function<int(
+    const XrPosef &stagePose, uint32_t fbo, int x, int y, int w, int h,
+    const XrFovf &fov, const XrPosef &viewPose)>;
 
 struct viewsurface {
   XrSwapchain swapchain;
@@ -62,16 +62,15 @@ class XrApp {
   int oxr_poll_events(XrInstance instance, XrSession session, bool *exit_loop,
                       bool *req_restart);
 
+  bool BeginFrame(XrPosef *stagePose);
+  // viewsurface *GetView(size_t i);
+  void EndFrame();
+  uint32_t SwapchainIndex() const;
 public:
   bool IsSessionRunning() { return m_session_running; }
   void CreateInstance(struct android_app *app);
   void CreateGraphics();
   void CreateSession();
   bool UpdateFrame();
-  bool BeginFrame(XrPosef *stagePose);
-  viewsurface *GetView(size_t i);
-  void EndFrame();
-  uint32_t SwapchainIndex() const;
+  void Render(const RenderFunc &func);
 };
-
-XrApp *GetAppEngine(void);

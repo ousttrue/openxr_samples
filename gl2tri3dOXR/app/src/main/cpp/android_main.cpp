@@ -2,6 +2,7 @@
 #include "openxr/openxr.h"
 #include "render_scene.h"
 #include "util_log.h"
+#include <functional>
 
 struct AndroidAppState {
   ANativeWindow *NativeWindow = nullptr;
@@ -66,19 +67,6 @@ void android_main(struct android_app *app) {
 
   xr.CreateSession();
 
-  // create backbuffer
-  for (int i = 0;; ++i) {
-    auto view = xr.GetView(i);
-    if (!view) {
-      break;
-    }
-
-    view->createBackbuffers();
-    //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
-    //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
-    //        sfc.width, sfc.height);
-  }
-
   while (app->destroyRequested == 0) {
     // Read all pending events.
     for (;;) {
@@ -98,27 +86,10 @@ void android_main(struct android_app *app) {
       }
     }
 
-    if (xr.UpdateFrame()) {
-      XrPosef stagePose;
-      if (xr.BeginFrame(&stagePose)) {
-        for (int i = 0;; ++i) {
-          auto view = xr.GetView(i);
-          if (!view) {
-            break;
-          }
-          auto renderTarget = view->acquireSwapchain();
-
-          int x = view->projLayerView.subImage.imageRect.offset.x;
-          int y = view->projLayerView.subImage.imageRect.offset.y;
-          int w = view->projLayerView.subImage.imageRect.extent.width;
-          int h = view->projLayerView.subImage.imageRect.extent.height;
-          renderer.render_gles_scene(stagePose, renderTarget->fbo_id, x, y, w, h,
-                                     view->projLayerView.fov,
-                                     view->projLayerView.pose);
-          view->releaseSwapchain();
-        }
-        xr.EndFrame();
-      }
-    }
+    xr.Render(std::bind(&Renderer::render_gles_scene, &renderer,
+                        std::placeholders::_1, std::placeholders::_2,
+                        std::placeholders::_3, std::placeholders::_4,
+                        std::placeholders::_5, std::placeholders::_6,
+                        std::placeholders::_7, std::placeholders::_8));
   }
 }

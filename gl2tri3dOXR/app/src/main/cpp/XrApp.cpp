@@ -315,9 +315,9 @@ int oxr_begin_session(XrSession session) {
   return 0;
 }
 
-int XrApp::oxr_handle_session_state_changed(
-    XrSession session, XrEventDataSessionStateChanged &ev, bool *exitLoop,
-    bool *reqRestart) {
+int XrApp::oxr_handle_session_state_changed(XrSession session,
+                                            XrEventDataSessionStateChanged &ev,
+                                            bool *exitLoop, bool *reqRestart) {
   XrSessionState old_state = m_session_state;
   XrSessionState new_state = ev.state;
   m_session_state = new_state;
@@ -384,7 +384,7 @@ static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
 }
 
 int XrApp::oxr_poll_events(XrInstance instance, XrSession session,
-                               bool *exit_loop, bool *req_restart) {
+                           bool *exit_loop, bool *req_restart) {
   *exit_loop = false;
   *req_restart = false;
 
@@ -577,8 +577,8 @@ std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
  * * Error handling
  * ----------------------------------------------------------------------------
  */
-void XrApp::oxr_check_errors(XrResult ret, const char *func,
-                                 const char *fname, int line) {
+void XrApp::oxr_check_errors(XrResult ret, const char *func, const char *fname,
+                             int line) {
   if (XR_FAILED(ret)) {
     char errbuf[XR_MAX_RESULT_STRING_SIZE];
     xrResultToString(m_instance, ret, errbuf);
@@ -688,6 +688,14 @@ void XrApp::CreateSession() {
   m_stageSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
 
   m_viewSurface = oxr_create_viewsurface(m_instance, m_systemId, m_session);
+
+  // create backbuffer
+  for (auto &view : m_viewSurface) {
+    view.createBackbuffers();
+    //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
+    //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
+    //        sfc.width, sfc.height);
+  }
 }
 
 /* ------------------------------------------------------------------------------------
@@ -772,10 +780,21 @@ void XrApp::EndFrame() {
   oxr_end_frame(m_session, m_displayTime, all_layers);
 }
 
-viewsurface *XrApp::GetView(size_t i) {
-  if (i >= m_viewSurface.size()) {
-    return nullptr;
+void XrApp::Render(const RenderFunc &func) {
+  if (UpdateFrame()) {
+    XrPosef stagePose;
+    if (BeginFrame(&stagePose)) {
+      for (auto &view : m_viewSurface) {
+        auto renderTarget = view.acquireSwapchain();
+        int x = view.projLayerView.subImage.imageRect.offset.x;
+        int y = view.projLayerView.subImage.imageRect.offset.y;
+        int w = view.projLayerView.subImage.imageRect.extent.width;
+        int h = view.projLayerView.subImage.imageRect.extent.height;
+        func(stagePose, renderTarget->fbo_id, x, y, w, h,
+             view.projLayerView.fov, view.projLayerView.pose);
+        view.releaseSwapchain();
+      }
+      EndFrame();
+    }
   }
-  auto view = &m_viewSurface[i];
-  return view;
 }
