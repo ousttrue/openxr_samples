@@ -101,21 +101,6 @@ struct viewsurface {
 };
 
 /* ----------------------------------------------------------------------------
- * * Space operation
- * ----------------------------------------------------------------------------
- */
-static XrSpace oxr_create_ref_space(XrSession session,
-                                    XrReferenceSpaceType ref_space_type) {
-  XrSpace space;
-  XrReferenceSpaceCreateInfo ci = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
-  ci.referenceSpaceType = ref_space_type;
-  ci.poseInReferenceSpace.orientation.w = 1;
-  xrCreateReferenceSpace(session, &ci, &space);
-
-  return space;
-}
-
-/* ----------------------------------------------------------------------------
  * * Session operation
  * ----------------------------------------------------------------------------
  */
@@ -532,9 +517,26 @@ struct XrAppImpl {
 
     m_session = oxr_create_session(m_instance, m_systemId);
 
-    m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
-    m_stageSpace =
-        oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
+    {
+      XrReferenceSpaceCreateInfo ci = {
+          .type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+          .referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL,
+          .poseInReferenceSpace = {
+              .orientation = {0, 0, 0, 1},
+              .position = {0, 0, 0},
+          }};
+      xrCreateReferenceSpace(m_session, &ci, &m_appSpace);
+    }
+    {
+      XrReferenceSpaceCreateInfo ci = {
+          .type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+          .referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE,
+          .poseInReferenceSpace = {
+              .orientation = {0, 0, 0, 1},
+              .position = {0, 0, 0},
+          }};
+      xrCreateReferenceSpace(m_session, &ci, &m_stageSpace);
+    }
 
     m_viewSurface = oxr_create_viewsurface(m_instance, m_systemId, m_session);
 
