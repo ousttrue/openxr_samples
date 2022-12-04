@@ -80,6 +80,9 @@ static void process_android_event(struct android_app *app,
 }
 
 void android_main(struct android_app *app) {
+  JNIEnv *Env;
+  app->activity->vm->AttachCurrentThread(&Env, nullptr);
+
   AndroidAppState appState = {};
   app->userData = &appState;
   app->onAppCmd = ProcessAndroidCmd;
