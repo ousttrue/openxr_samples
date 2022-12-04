@@ -101,22 +101,6 @@ struct viewsurface {
 };
 
 /* ----------------------------------------------------------------------------
- * * Frame operation
- * ----------------------------------------------------------------------------
- */
-static int oxr_end_frame(XrSession session, XrTime dpy_time,
-                         std::vector<XrCompositionLayerBaseHeader *> &layers) {
-  XrFrameEndInfo frameEnd{XR_TYPE_FRAME_END_INFO};
-  frameEnd.displayTime = dpy_time;
-  frameEnd.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-  frameEnd.layerCount = (uint32_t)layers.size();
-  frameEnd.layers = layers.data();
-  xrEndFrame(session, &frameEnd);
-
-  return 0;
-}
-
-/* ----------------------------------------------------------------------------
  * * Space operation
  * ----------------------------------------------------------------------------
  */
@@ -648,8 +632,15 @@ struct XrAppImpl {
     all_layers.push_back(
         reinterpret_cast<XrCompositionLayerBaseHeader *>(&projLayer));
 
-    /* Compose all layers */
-    oxr_end_frame(m_session, m_displayTime, all_layers);
+    // Compose all layers
+    XrFrameEndInfo frameEnd{
+        .type = XR_TYPE_FRAME_END_INFO,
+        .displayTime = m_displayTime,
+        .environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+        .layerCount = (uint32_t)all_layers.size(),
+        .layers = all_layers.data(),
+    };
+    xrEndFrame(m_session, &frameEnd);
   }
 };
 
