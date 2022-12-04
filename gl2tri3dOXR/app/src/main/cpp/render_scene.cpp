@@ -37,9 +37,14 @@ void main(void)                                             \n\
     gl_FragColor = v_color;                                 \n\
 }                                                           ";
 
-void Renderer::init_gles_scene() {
+void Renderer::init_gles_scene(int *major, int *minor) {
+  egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
   generate_shader(&s_sobj, s_strVS, s_strFS);
   init_dbgstr(0, 0);
+
+  // GLint major, minor;
+  glGetIntegerv(GL_MAJOR_VERSION, major);
+  glGetIntegerv(GL_MINOR_VERSION, minor);
 }
 
 int Renderer::draw_line(float *mtxPV, float *p0, float *p1, float *color) {

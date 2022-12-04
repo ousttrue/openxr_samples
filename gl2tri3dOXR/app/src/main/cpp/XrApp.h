@@ -13,8 +13,7 @@ public:
   XrApp();
   ~XrApp();
   bool CreateInstance(struct android_app *app);
-  bool CreateGraphics();
-  bool CreateSession();
+  bool CreateSession_EGL(int major, int minor);
   bool IsSessionRunning() const;
   void Render(const RenderFunc &func);
 };

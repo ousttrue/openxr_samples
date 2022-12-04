@@ -79,9 +79,6 @@ static void process_android_event(struct android_app *app,
   }
 }
 
-/*--------------------------------------------------------------------------- *
- *      M A I N    F U N C T I O N
- *--------------------------------------------------------------------------- */
 void android_main(struct android_app *app) {
   AndroidAppState appState = {};
   app->userData = &appState;
@@ -91,14 +88,13 @@ void android_main(struct android_app *app) {
   if (!xr.CreateInstance(app)) {
     return;
   }
-  if (!xr.CreateGraphics()) {
-    return;
-  }
 
   Renderer renderer;
-  renderer.init_gles_scene();
+  int major;
+  int minor;
+  renderer.init_gles_scene(&major, &minor);
 
-  if (!xr.CreateSession()) {
+  if (!xr.CreateSession_EGL(major, minor)) {
     return;
   }
 

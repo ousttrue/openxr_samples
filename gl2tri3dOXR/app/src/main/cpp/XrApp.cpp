@@ -127,39 +127,6 @@ std::string oxr_get_system_name(XrInstance instance, XrSystemId sysid) {
 }
 
 /* ----------------------------------------------------------------------------
- * * Confirm OpenGLES version.
- * ----------------------------------------------------------------------------
- */
-int oxr_confirm_gfx_requirements(XrInstance instance, XrSystemId sysid) {
-  PFN_xrGetOpenGLESGraphicsRequirementsKHR xrGetOpenGLESGraphicsRequirementsKHR;
-  xrGetInstanceProcAddr(
-      instance, "xrGetOpenGLESGraphicsRequirementsKHR",
-      (PFN_xrVoidFunction *)&xrGetOpenGLESGraphicsRequirementsKHR);
-
-  XrGraphicsRequirementsOpenGLESKHR gfxReq = {
-      XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR};
-  xrGetOpenGLESGraphicsRequirementsKHR(instance, sysid, &gfxReq);
-
-  GLint major, minor;
-  glGetIntegerv(GL_MAJOR_VERSION, &major);
-  glGetIntegerv(GL_MINOR_VERSION, &minor);
-  XrVersion glver = XR_MAKE_VERSION(major, minor, 0);
-
-  LOGI("GLES version: %" PRIx64 ", supported: (%" PRIx64 " - %" PRIx64 ")\n",
-       glver, gfxReq.minApiVersionSupported, gfxReq.maxApiVersionSupported);
-
-  if (glver < gfxReq.minApiVersionSupported ||
-      glver > gfxReq.maxApiVersionSupported) {
-    LOGE("GLES version %" PRIx64 " is not supported. (%" PRIx64 " - %" PRIx64
-         ")\n",
-         glver, gfxReq.minApiVersionSupported, gfxReq.maxApiVersionSupported);
-    return -1;
-  }
-
-  return 0;
-}
-
-/* ----------------------------------------------------------------------------
  * * Frame operation
  * ----------------------------------------------------------------------------
  */
@@ -742,14 +709,35 @@ struct XrAppImpl {
     return true;
   }
 
-  bool CreateGraphics() {
-    egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
-    oxr_confirm_gfx_requirements(m_instance, m_systemId);
-    return true;
-  }
+  bool CreateSession(int major, int minor) {
+    // oxr_confirm_gfx_requirements(m_instance, m_systemId);
+    PFN_xrGetOpenGLESGraphicsRequirementsKHR
+        xrGetOpenGLESGraphicsRequirementsKHR;
+    xrGetInstanceProcAddr(
+        m_instance, "xrGetOpenGLESGraphicsRequirementsKHR",
+        (PFN_xrVoidFunction *)&xrGetOpenGLESGraphicsRequirementsKHR);
 
-  bool CreateSession() {
+    XrGraphicsRequirementsOpenGLESKHR gfxReq = {
+        .type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR,
+    };
+    if (XR_FAILED(xrGetOpenGLESGraphicsRequirementsKHR(m_instance, m_systemId,
+                                                       &gfxReq))) {
+      return false;
+    }
+
+    XrVersion glver = XR_MAKE_VERSION(major, minor, 0);
+    LOGI("GLES version: %" PRIx64 ", supported: (%" PRIx64 " - %" PRIx64 ")\n",
+         glver, gfxReq.minApiVersionSupported, gfxReq.maxApiVersionSupported);
+    if (glver < gfxReq.minApiVersionSupported ||
+        glver > gfxReq.maxApiVersionSupported) {
+      LOGE("GLES version %" PRIx64 " is not supported. (%" PRIx64 " - %" PRIx64
+           ")\n",
+           glver, gfxReq.minApiVersionSupported, gfxReq.maxApiVersionSupported);
+      return false;
+    }
+
     m_session = oxr_create_session(m_instance, m_systemId);
+
     m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
     m_stageSpace =
         oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
@@ -855,7 +843,8 @@ XrApp::~XrApp() { delete impl_; }
 bool XrApp::CreateInstance(struct android_app *app) {
   return impl_->CreateInstance(app);
 }
-bool XrApp::CreateGraphics() { return impl_->CreateGraphics(); }
-bool XrApp::CreateSession() { return impl_->CreateSession(); }
+bool XrApp::CreateSession_EGL(int major, int minor) {
+  return impl_->CreateSession(major, minor);
+}
 bool XrApp::IsSessionRunning() const { return impl_->m_session_running; }
 void XrApp::Render(const RenderFunc &func) { return impl_->Render(func); }

@@ -6,7 +6,7 @@ class Renderer {
   shader_obj_t s_sobj;
 
 public:
-  void init_gles_scene();
+  void init_gles_scene(int *major, int *minor);
   void render_gles_scene(unsigned int fbo,
                          const render_interface::ViewInfo &info);
 
