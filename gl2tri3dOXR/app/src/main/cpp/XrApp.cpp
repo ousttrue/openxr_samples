@@ -100,38 +100,6 @@ struct viewsurface {
   }
 };
 
-/* ----------------------------------------------------------------------------
- * * Session operation
- * ----------------------------------------------------------------------------
- */
-
-static XrSession oxr_create_session(XrInstance instance, XrSystemId sysid) {
-  XrGraphicsBindingOpenGLESAndroidKHR gfxBind = {
-      XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR};
-  gfxBind.display = egl_get_display();
-  gfxBind.config = egl_get_config();
-  gfxBind.context = egl_get_context();
-
-  XrSessionCreateInfo ci = {XR_TYPE_SESSION_CREATE_INFO};
-  ci.next = &gfxBind;
-  ci.systemId = sysid;
-
-  XrSession session;
-  xrCreateSession(instance, &ci, &session);
-
-  return session;
-}
-
-static int oxr_begin_session(XrSession session) {
-  XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-
-  XrSessionBeginInfo bi{XR_TYPE_SESSION_BEGIN_INFO};
-  bi.primaryViewConfigurationType = viewType;
-  xrBeginSession(session, &bi);
-
-  return 0;
-}
-
 static XrEventDataBuffer s_evDataBuf;
 
 static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
@@ -318,26 +286,31 @@ struct XrAppImpl {
     }
 
     switch (new_state) {
-    case XR_SESSION_STATE_READY:
-      oxr_begin_session(session);
+    case XR_SESSION_STATE_READY: {
+      XrSessionBeginInfo bi{
+          .type = XR_TYPE_SESSION_BEGIN_INFO,
+          .primaryViewConfigurationType =
+              XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+      };
+      xrBeginSession(session, &bi);
       m_session_running = true;
-      break;
+    } break;
 
-    case XR_SESSION_STATE_STOPPING:
+    case XR_SESSION_STATE_STOPPING: {
       xrEndSession(session);
       m_session_running = false;
-      break;
+    } break;
 
-    case XR_SESSION_STATE_EXITING:
+    case XR_SESSION_STATE_EXITING: {
       *exitLoop = true;
       *reqRestart =
           false; // Do not attempt to restart because user closed this session.
-      break;
+    } break;
 
-    case XR_SESSION_STATE_LOSS_PENDING:
+    case XR_SESSION_STATE_LOSS_PENDING: {
       *exitLoop = true;
       *reqRestart = true; // Poll for a new instance.
-      break;
+    } break;
 
     default:
       break;
@@ -515,7 +488,20 @@ struct XrAppImpl {
       return false;
     }
 
-    m_session = oxr_create_session(m_instance, m_systemId);
+    XrGraphicsBindingOpenGLESAndroidKHR gfxBind = {
+        .type = XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR,
+        .display = egl_get_display(),
+        .config = egl_get_config(),
+        .context = egl_get_context(),
+    };
+    XrSessionCreateInfo ci = {
+        .type = XR_TYPE_SESSION_CREATE_INFO,
+        .next = &gfxBind,
+        .systemId = m_systemId,
+    };
+    if (XR_FAILED(xrCreateSession(m_instance, &ci, &m_session))) {
+      return false;
+    }
 
     {
       XrReferenceSpaceCreateInfo ci = {
