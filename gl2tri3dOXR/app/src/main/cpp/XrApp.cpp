@@ -6,27 +6,12 @@
 #include <GLES3/gl31.h>
 #include <array>
 #include <assert.h>
+#include <memory>
+#include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <openxr/openxr_reflection.h>
 #include <string>
-
-
-struct viewsurface {
-  XrSwapchain swapchain;
-  uint32_t width;
-  uint32_t height;
-
-  XrView view;
-  XrCompositionLayerProjectionView projLayerView;
-
-  std::vector<std::shared_ptr<render_target>> backbuffers;
-
-  std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const;
-  void createBackbuffers();
-
-  std::shared_ptr<render_target> acquireSwapchain();
-  void releaseSwapchain() const;
-};
+#include <vector>
 
 #define OXR_CHECK(func) oxr_check_errors(func, #func, __FILE__, __LINE__);
 
@@ -47,6 +32,71 @@ MAKE_TO_STRING_FUNC(XrEnvironmentBlendMode);
 MAKE_TO_STRING_FUNC(XrSessionState);
 MAKE_TO_STRING_FUNC(XrResult);
 MAKE_TO_STRING_FUNC(XrFormFactor);
+
+struct viewsurface {
+  XrSwapchain swapchain;
+  uint32_t width;
+  uint32_t height;
+
+  XrView view;
+  XrCompositionLayerProjectionView projLayerView;
+
+  std::vector<std::shared_ptr<render_target>> backbuffers;
+
+  std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const {
+    uint32_t imgCnt;
+    xrEnumerateSwapchainImages(swapchain, 0, &imgCnt, NULL);
+    std::vector<XrSwapchainImageOpenGLESKHR> img_gles(imgCnt);
+    for (uint32_t i = 0; i < imgCnt; i++) {
+      img_gles[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
+    }
+    xrEnumerateSwapchainImages(swapchain, imgCnt, &imgCnt,
+                               (XrSwapchainImageBaseHeader *)img_gles.data());
+    return img_gles;
+  }
+
+  void createBackbuffers() {
+    auto img_gles = getSwapchainImages();
+    for (uint32_t j = 0; j < img_gles.size(); j++) {
+      GLuint tex_c = img_gles[j].image;
+      auto render_target = render_target::create(tex_c, width, height);
+      assert(render_target);
+      backbuffers.push_back(render_target);
+    }
+  }
+
+  std::shared_ptr<render_target> acquireSwapchain() {
+    projLayerView = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
+    projLayerView.pose = view.pose;
+    projLayerView.fov = view.fov;
+
+    XrSwapchainSubImage subImg;
+    subImg.swapchain = swapchain;
+    subImg.imageRect.offset.x = 0;
+    subImg.imageRect.offset.y = 0;
+    subImg.imageRect.extent.width = width;
+    subImg.imageRect.extent.height = height;
+    subImg.imageArrayIndex = 0;
+    projLayerView.subImage = subImg;
+
+    XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
+    waitInfo.timeout = XR_INFINITE_DURATION;
+    xrWaitSwapchainImage(swapchain, &waitInfo);
+
+    uint32_t imgIdx;
+    XrSwapchainImageAcquireInfo acquireInfo{
+        XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
+    xrAcquireSwapchainImage(swapchain, &acquireInfo, &imgIdx);
+    return backbuffers[imgIdx];
+  }
+
+  void releaseSwapchain() const {
+    // oxr_release_viewsurface(m_viewSurface[i]);
+    XrSwapchainImageReleaseInfo releaseInfo{
+        XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+    xrReleaseSwapchainImage(swapchain, &releaseInfo);
+  }
+};
 
 /* ----------------------------------------------------------------------------
  * * Create OpenXR Instance with Android/OpenGLES binding
@@ -334,49 +384,6 @@ int oxr_begin_session(XrSession session) {
   return 0;
 }
 
-int XrApp::oxr_handle_session_state_changed(XrSession session,
-                                            XrEventDataSessionStateChanged &ev,
-                                            bool *exitLoop, bool *reqRestart) {
-  XrSessionState old_state = m_session_state;
-  XrSessionState new_state = ev.state;
-  m_session_state = new_state;
-
-  LOGI("  [SessionState]: %s -> %s (session=%p, time=%ld)",
-       to_string(old_state), to_string(new_state), ev.session, ev.time);
-
-  if ((ev.session != XR_NULL_HANDLE) && (ev.session != session)) {
-    LOGE("XrEventDataSessionStateChanged for unknown session");
-    return -1;
-  }
-
-  switch (new_state) {
-  case XR_SESSION_STATE_READY:
-    oxr_begin_session(session);
-    m_session_running = true;
-    break;
-
-  case XR_SESSION_STATE_STOPPING:
-    xrEndSession(session);
-    m_session_running = false;
-    break;
-
-  case XR_SESSION_STATE_EXITING:
-    *exitLoop = true;
-    *reqRestart =
-        false; // Do not attempt to restart because user closed this session.
-    break;
-
-  case XR_SESSION_STATE_LOSS_PENDING:
-    *exitLoop = true;
-    *reqRestart = true; // Poll for a new instance.
-    break;
-
-  default:
-    break;
-  }
-  return 0;
-}
-
 static XrEventDataBuffer s_evDataBuf;
 
 static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
@@ -400,99 +407,6 @@ static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
     LOGW("%p events lost", evLost);
   }
   return ev;
-}
-
-int XrApp::oxr_poll_events(XrInstance instance, XrSession session,
-                           bool *exit_loop, bool *req_restart) {
-  *exit_loop = false;
-  *req_restart = false;
-
-  // Process all pending messages.
-  while (XrEventDataBaseHeader *ev = oxr_poll_event(instance, session)) {
-    switch (ev->type) {
-    case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: {
-      LOGW("XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING");
-      *exit_loop = true;
-      *req_restart = true;
-      return -1;
-    }
-
-    case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
-      LOGW("XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED");
-      XrEventDataSessionStateChanged sess_ev =
-          *(XrEventDataSessionStateChanged *)ev;
-      oxr_handle_session_state_changed(session, sess_ev, exit_loop,
-                                       req_restart);
-      break;
-    }
-
-    case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
-      LOGW("XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED");
-      break;
-
-    case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
-      LOGW("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING");
-      break;
-
-    default:
-      LOGE("Unknown event type %d", ev->type);
-      break;
-    }
-  }
-  return 0;
-}
-
-std::vector<XrSwapchainImageOpenGLESKHR>
-viewsurface::getSwapchainImages() const {
-  uint32_t imgCnt;
-  xrEnumerateSwapchainImages(swapchain, 0, &imgCnt, NULL);
-  std::vector<XrSwapchainImageOpenGLESKHR> img_gles(imgCnt);
-  for (uint32_t i = 0; i < imgCnt; i++) {
-    img_gles[i].type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR;
-  }
-  xrEnumerateSwapchainImages(swapchain, imgCnt, &imgCnt,
-                             (XrSwapchainImageBaseHeader *)img_gles.data());
-  return img_gles;
-}
-
-void viewsurface::createBackbuffers() {
-  auto img_gles = getSwapchainImages();
-  for (uint32_t j = 0; j < img_gles.size(); j++) {
-    GLuint tex_c = img_gles[j].image;
-    auto render_target = render_target::create(tex_c, width, height);
-    assert(render_target);
-    backbuffers.push_back(render_target);
-  }
-}
-
-std::shared_ptr<render_target> viewsurface::acquireSwapchain() {
-  projLayerView = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};
-  projLayerView.pose = view.pose;
-  projLayerView.fov = view.fov;
-
-  XrSwapchainSubImage subImg;
-  subImg.swapchain = swapchain;
-  subImg.imageRect.offset.x = 0;
-  subImg.imageRect.offset.y = 0;
-  subImg.imageRect.extent.width = width;
-  subImg.imageRect.extent.height = height;
-  subImg.imageArrayIndex = 0;
-  projLayerView.subImage = subImg;
-
-  XrSwapchainImageWaitInfo waitInfo{XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-  waitInfo.timeout = XR_INFINITE_DURATION;
-  xrWaitSwapchainImage(swapchain, &waitInfo);
-
-  uint32_t imgIdx;
-  XrSwapchainImageAcquireInfo acquireInfo{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-  xrAcquireSwapchainImage(swapchain, &acquireInfo, &imgIdx);
-  return backbuffers[imgIdx];
-}
-
-void viewsurface::releaseSwapchain() const {
-  // oxr_release_viewsurface(m_viewSurface[i]);
-  XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-  xrReleaseSwapchainImage(swapchain, &releaseInfo);
 }
 
 /* ----------------------------------------------------------------------------
@@ -592,144 +506,6 @@ oxr_create_viewsurface(XrInstance instance, XrSystemId sysid,
   return sfcArray;
 }
 
-/* ----------------------------------------------------------------------------
- * * Error handling
- * ----------------------------------------------------------------------------
- */
-void XrApp::oxr_check_errors(XrResult ret, const char *func, const char *fname,
-                             int line) {
-  if (XR_FAILED(ret)) {
-    char errbuf[XR_MAX_RESULT_STRING_SIZE];
-    xrResultToString(m_instance, ret, errbuf);
-
-    LOGE("[OXR ERROR] %s(%d):%s: %s\n", fname, line, func, errbuf);
-  }
-}
-
-/* ----------------------------------------------------------------------------
- * * Initialize OpenXR with OpenGLES renderer
- * ----------------------------------------------------------------------------
- */
-void XrApp::CreateInstance(struct android_app *app) {
-  // initialize loader
-  PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;
-  xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
-                        (PFN_xrVoidFunction *)&xrInitializeLoaderKHR);
-  XrLoaderInitInfoAndroidKHR info = {
-      .type = XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR,
-      .applicationVM = app->activity->vm,
-      .applicationContext = app->activity->clazz,
-  };
-  OXR_CHECK(xrInitializeLoaderKHR((XrLoaderInitInfoBaseHeaderKHR *)&info));
-
-  // enumerate extension properties
-  // uint32_t ext_count = 0;
-  // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count,
-  // NULL)); XrExtensionProperties extProps[ext_count]; for (uint32_t i = 0; i <
-  // ext_count; i++) {
-  //   extProps[i].type = XR_TYPE_EXTENSION_PROPERTIES;
-  //   extProps[i].next = NULL;
-  // }
-  // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, ext_count,
-  // &ext_count,
-  //                                                  extProps));
-  // for (uint32_t i = 0; i < ext_count; i++) {
-  //   LOGI("InstanceExt[%2d/%2d]: %s\n", i, ext_count,
-  //   extProps[i].extensionName);
-  // }
-
-  // create instance
-  XrInstanceCreateInfoAndroidKHR ciAndroid = {
-      .type = XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR,
-      .applicationVM = app->activity->vm,
-      .applicationActivity = app->activity->clazz,
-  };
-  std::array<const char *, 2> extensions = {
-      "XR_KHR_android_create_instance",
-      "XR_KHR_opengl_es_enable",
-  };
-  XrInstanceCreateInfo ci = {
-      .type = XR_TYPE_INSTANCE_CREATE_INFO,
-      .next = &ciAndroid,
-      .applicationInfo =
-          {
-              .apiVersion = XR_CURRENT_API_VERSION,
-          },
-      .enabledExtensionCount = (uint32_t)extensions.size(),
-      .enabledExtensionNames = extensions.data(),
-  };
-  strncpy(ci.applicationInfo.applicationName, "OXR_GLES_APP",
-          XR_MAX_ENGINE_NAME_SIZE - 1);
-  OXR_CHECK(xrCreateInstance(&ci, &m_instance));
-
-  // // query instance name, version
-  // XrInstanceProperties instanceProp = {.type = XR_TYPE_INSTANCE_PROPERTIES};
-  // xrGetInstanceProperties(m_instance, &instanceProp);
-  // LOGI("OpenXR Instance Runtime   : \"%s\", Version: %u.%u.%u",
-  //      instanceProp.runtimeName,
-  //      XR_VERSION_MAJOR(instanceProp.runtimeVersion),
-  //      XR_VERSION_MINOR(instanceProp.runtimeVersion),
-  //      XR_VERSION_PATCH(instanceProp.runtimeVersion));
-
-  XrSystemGetInfo sysInfo = {
-      .type = XR_TYPE_SYSTEM_GET_INFO,
-      .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
-  };
-  OXR_CHECK(xrGetSystem(m_instance, &sysInfo, &m_systemId));
-
-  // // query system properties
-  // XrSystemProperties systemProp = {
-  //     .type = XR_TYPE_SYSTEM_PROPERTIES,
-  // };
-  // xrGetSystemProperties(m_instance, m_systemId, &systemProp);
-  // LOGI("-----------------------------------------------------------------");
-  // LOGI("System Properties         : Name=\"%s\", VendorId=%x",
-  // systemProp.systemName,
-  //      systemProp.vendorId);
-  // LOGI("System Graphics Properties: SwapchainMaxWH=(%d, %d), MaxLayers=%d",
-  //      systemProp.graphicsProperties.maxSwapchainImageWidth,
-  //      systemProp.graphicsProperties.maxSwapchainImageHeight,
-  //      systemProp.graphicsProperties.maxLayerCount);
-  // LOGI("System Tracking Properties: Orientation=%d, Position=%d",
-  //      systemProp.trackingProperties.orientationTracking,
-  //      systemProp.trackingProperties.positionTracking);
-  // LOGI("-----------------------------------------------------------------");
-}
-
-void XrApp::CreateGraphics() {
-  egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
-  oxr_confirm_gfx_requirements(m_instance, m_systemId);
-}
-
-void XrApp::CreateSession() {
-  m_session = oxr_create_session(m_instance, m_systemId);
-  m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
-  m_stageSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
-
-  m_viewSurface = oxr_create_viewsurface(m_instance, m_systemId, m_session);
-
-  // create backbuffer
-  for (auto &view : m_viewSurface) {
-    view->createBackbuffers();
-    //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
-    //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
-    //        sfc->width, sfc->height);
-  }
-}
-
-/* ------------------------------------------------------------------------------------
- * * Update  Frame (Event handle, Render)
- * ------------------------------------------------------------------------------------
- */
-bool XrApp::UpdateFrame() {
-  bool exit_loop, req_restart;
-  oxr_poll_events(m_instance, m_session, &exit_loop, &req_restart);
-  if (!IsSessionRunning()) {
-    return false;
-  }
-  return true;
-}
-
 /* ------------------------------------------------------------------------------------
  * * RenderFrame (Frame/Layer/View)
  * ------------------------------------------------------------------------------------
@@ -756,64 +532,323 @@ static bool oxr_locate_views(XrSession session, XrTime dpy_time, XrSpace space,
   return true;
 }
 
-bool XrApp::BeginFrame(XrPosef *stagePose) {
-  oxr_begin_frame(m_session, &m_displayTime);
+struct XrAppImpl {
+  XrInstance m_instance;
+  XrSession m_session;
+  XrSystemId m_systemId;
 
-  /* Acquire View Location */
-  std::vector<XrView> views(m_viewSurface.size());
+  XrSessionState m_session_state = XR_SESSION_STATE_UNKNOWN;
 
-  if (!oxr_locate_views(m_session, m_displayTime, m_appSpace, views.size(),
-                        views.data())) {
-    return false;
-  }
+  XrSpace m_appSpace;
+  XrSpace m_stageSpace;
+  std::vector<std::shared_ptr<struct viewsurface>> m_viewSurface;
 
-  for (int i = 0; i < views.size(); ++i) {
-    m_viewSurface[i]->view = views[i];
-  }
+  XrTime m_displayTime;
+  void oxr_check_errors(XrResult ret, const char *func, const char *fname,
+                        int line) {
+    if (XR_FAILED(ret)) {
+      char errbuf[XR_MAX_RESULT_STRING_SIZE];
+      xrResultToString(m_instance, ret, errbuf);
 
-  /* Acquire Stage Location (rerative to the View Location) */
-  XrSpaceLocation stageLoc{XR_TYPE_SPACE_LOCATION};
-  xrLocateSpace(m_stageSpace, m_appSpace, m_displayTime, &stageLoc);
-  *stagePose = stageLoc.pose;
-
-  return true;
-}
-
-void XrApp::EndFrame() {
-  std::vector<XrCompositionLayerProjectionView> projLayerViews;
-  for (auto view : m_viewSurface) {
-    projLayerViews.push_back(view->projLayerView);
-  }
-
-  XrCompositionLayerProjection projLayer;
-  projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
-  projLayer.space = m_appSpace;
-  projLayer.viewCount = (uint32_t)projLayerViews.size();
-  projLayer.views = projLayerViews.data();
-
-  std::vector<XrCompositionLayerBaseHeader *> all_layers;
-  all_layers.push_back(
-      reinterpret_cast<XrCompositionLayerBaseHeader *>(&projLayer));
-
-  /* Compose all layers */
-  oxr_end_frame(m_session, m_displayTime, all_layers);
-}
-
-void XrApp::Render(const RenderFunc &func) {
-  if (UpdateFrame()) {
-    XrPosef stagePose;
-    if (BeginFrame(&stagePose)) {
-      for (auto &view : m_viewSurface) {
-        auto renderTarget = view->acquireSwapchain();
-        int x = view->projLayerView.subImage.imageRect.offset.x;
-        int y = view->projLayerView.subImage.imageRect.offset.y;
-        int w = view->projLayerView.subImage.imageRect.extent.width;
-        int h = view->projLayerView.subImage.imageRect.extent.height;
-        func(stagePose, renderTarget->fbo_id, x, y, w, h,
-             view->projLayerView.fov, view->projLayerView.pose);
-        view->releaseSwapchain();
-      }
-      EndFrame();
+      LOGE("[OXR ERROR] %s(%d):%s: %s\n", fname, line, func, errbuf);
     }
   }
+
+  int oxr_handle_session_state_changed(XrSession session,
+                                       XrEventDataSessionStateChanged &ev,
+                                       bool *exitLoop, bool *reqRestart) {
+    XrSessionState old_state = m_session_state;
+    XrSessionState new_state = ev.state;
+    m_session_state = new_state;
+
+    LOGI("  [SessionState]: %s -> %s (session=%p, time=%ld)",
+         to_string(old_state), to_string(new_state), ev.session, ev.time);
+
+    if ((ev.session != XR_NULL_HANDLE) && (ev.session != session)) {
+      LOGE("XrEventDataSessionStateChanged for unknown session");
+      return -1;
+    }
+
+    switch (new_state) {
+    case XR_SESSION_STATE_READY:
+      oxr_begin_session(session);
+      m_session_running = true;
+      break;
+
+    case XR_SESSION_STATE_STOPPING:
+      xrEndSession(session);
+      m_session_running = false;
+      break;
+
+    case XR_SESSION_STATE_EXITING:
+      *exitLoop = true;
+      *reqRestart =
+          false; // Do not attempt to restart because user closed this session.
+      break;
+
+    case XR_SESSION_STATE_LOSS_PENDING:
+      *exitLoop = true;
+      *reqRestart = true; // Poll for a new instance.
+      break;
+
+    default:
+      break;
+    }
+    return 0;
+  }
+
+  int oxr_poll_events(XrInstance instance, XrSession session, bool *exit_loop,
+                      bool *req_restart) {
+    *exit_loop = false;
+    *req_restart = false;
+
+    // Process all pending messages.
+    while (XrEventDataBaseHeader *ev = oxr_poll_event(instance, session)) {
+      switch (ev->type) {
+      case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: {
+        LOGW("XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING");
+        *exit_loop = true;
+        *req_restart = true;
+        return -1;
+      }
+
+      case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
+        LOGW("XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED");
+        XrEventDataSessionStateChanged sess_ev =
+            *(XrEventDataSessionStateChanged *)ev;
+        oxr_handle_session_state_changed(session, sess_ev, exit_loop,
+                                         req_restart);
+        break;
+      }
+
+      case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+        LOGW("XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED");
+        break;
+
+      case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
+        LOGW("XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING");
+        break;
+
+      default:
+        LOGE("Unknown event type %d", ev->type);
+        break;
+      }
+    }
+    return 0;
+  }
+
+  uint32_t SwapchainIndex() const;
+
+  bool m_session_running = false;
+
+  ///--------------------------------------------------------------------------
+  /// Initialize OpenXR with OpenGLES renderer
+  ///--------------------------------------------------------------------------
+  bool CreateInstance(struct android_app *app) {
+    // initialize loader
+    PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;
+    xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
+                          (PFN_xrVoidFunction *)&xrInitializeLoaderKHR);
+    XrLoaderInitInfoAndroidKHR info = {
+        .type = XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR,
+        .applicationVM = app->activity->vm,
+        .applicationContext = app->activity->clazz,
+    };
+    if (XR_FAILED(
+            xrInitializeLoaderKHR((XrLoaderInitInfoBaseHeaderKHR *)&info))) {
+      return false;
+    }
+
+    // enumerate extension properties
+    // uint32_t ext_count = 0;
+    // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count,
+    // NULL)); XrExtensionProperties extProps[ext_count]; for (uint32_t i = 0; i
+    // < ext_count; i++) {
+    //   extProps[i].type = XR_TYPE_EXTENSION_PROPERTIES;
+    //   extProps[i].next = NULL;
+    // }
+    // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, ext_count,
+    // &ext_count,
+    //                                                  extProps));
+    // for (uint32_t i = 0; i < ext_count; i++) {
+    //   LOGI("InstanceExt[%2d/%2d]: %s\n", i, ext_count,
+    //   extProps[i].extensionName);
+    // }
+
+    // create instance
+    XrInstanceCreateInfoAndroidKHR ciAndroid = {
+        .type = XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR,
+        .applicationVM = app->activity->vm,
+        .applicationActivity = app->activity->clazz,
+    };
+    std::array<const char *, 2> extensions = {
+        "XR_KHR_android_create_instance",
+        "XR_KHR_opengl_es_enable",
+    };
+    XrInstanceCreateInfo ci = {
+        .type = XR_TYPE_INSTANCE_CREATE_INFO,
+        .next = &ciAndroid,
+        .applicationInfo =
+            {
+                .apiVersion = XR_CURRENT_API_VERSION,
+            },
+        .enabledExtensionCount = (uint32_t)extensions.size(),
+        .enabledExtensionNames = extensions.data(),
+    };
+    strncpy(ci.applicationInfo.applicationName, "OXR_GLES_APP",
+            XR_MAX_ENGINE_NAME_SIZE - 1);
+    if (XR_FAILED(xrCreateInstance(&ci, &m_instance))) {
+      return false;
+    }
+
+    // // query instance name, version
+    // XrInstanceProperties instanceProp = {.type =
+    // XR_TYPE_INSTANCE_PROPERTIES}; xrGetInstanceProperties(m_instance,
+    // &instanceProp); LOGI("OpenXR Instance Runtime   : \"%s\", Version:
+    // %u.%u.%u",
+    //      instanceProp.runtimeName,
+    //      XR_VERSION_MAJOR(instanceProp.runtimeVersion),
+    //      XR_VERSION_MINOR(instanceProp.runtimeVersion),
+    //      XR_VERSION_PATCH(instanceProp.runtimeVersion));
+
+    XrSystemGetInfo sysInfo = {
+        .type = XR_TYPE_SYSTEM_GET_INFO,
+        .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
+    };
+    if (XR_FAILED(xrGetSystem(m_instance, &sysInfo, &m_systemId))) {
+      return false;
+    }
+
+    // // query system properties
+    // XrSystemProperties systemProp = {
+    //     .type = XR_TYPE_SYSTEM_PROPERTIES,
+    // };
+    // xrGetSystemProperties(m_instance, m_systemId, &systemProp);
+    // LOGI("-----------------------------------------------------------------");
+    // LOGI("System Properties         : Name=\"%s\", VendorId=%x",
+    // systemProp.systemName,
+    //      systemProp.vendorId);
+    // LOGI("System Graphics Properties: SwapchainMaxWH=(%d, %d), MaxLayers=%d",
+    //      systemProp.graphicsProperties.maxSwapchainImageWidth,
+    //      systemProp.graphicsProperties.maxSwapchainImageHeight,
+    //      systemProp.graphicsProperties.maxLayerCount);
+    // LOGI("System Tracking Properties: Orientation=%d, Position=%d",
+    //      systemProp.trackingProperties.orientationTracking,
+    //      systemProp.trackingProperties.positionTracking);
+    // LOGI("-----------------------------------------------------------------");
+
+    return true;
+  }
+
+  bool CreateGraphics() {
+    egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
+    oxr_confirm_gfx_requirements(m_instance, m_systemId);
+    return true;
+  }
+
+  bool CreateSession() {
+    m_session = oxr_create_session(m_instance, m_systemId);
+    m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
+    m_stageSpace =
+        oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
+
+    m_viewSurface = oxr_create_viewsurface(m_instance, m_systemId, m_session);
+
+    // create backbuffer
+    for (auto &view : m_viewSurface) {
+      view->createBackbuffers();
+      //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
+      //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
+      //        sfc->width, sfc->height);
+    }
+    return true;
+  }
+
+  /* ------------------------------------------------------------------------------------
+   * * Update  Frame (Event handle, Render)
+   * ------------------------------------------------------------------------------------
+   */
+  bool UpdateFrame() {
+    bool exit_loop, req_restart;
+    oxr_poll_events(m_instance, m_session, &exit_loop, &req_restart);
+    if (!m_session_running) {
+      return false;
+    }
+    return true;
+  }
+
+  void Render(const RenderFunc &func) {
+    if (UpdateFrame()) {
+      XrPosef stagePose;
+      if (BeginFrame(&stagePose)) {
+        for (auto &view : m_viewSurface) {
+          auto renderTarget = view->acquireSwapchain();
+          int x = view->projLayerView.subImage.imageRect.offset.x;
+          int y = view->projLayerView.subImage.imageRect.offset.y;
+          int w = view->projLayerView.subImage.imageRect.extent.width;
+          int h = view->projLayerView.subImage.imageRect.extent.height;
+          func(stagePose, renderTarget->fbo_id, x, y, w, h,
+               view->projLayerView.fov, view->projLayerView.pose);
+          view->releaseSwapchain();
+        }
+        EndFrame();
+      }
+    }
+  }
+
+  bool BeginFrame(XrPosef *stagePose) {
+    oxr_begin_frame(m_session, &m_displayTime);
+
+    /* Acquire View Location */
+    std::vector<XrView> views(m_viewSurface.size());
+
+    if (!oxr_locate_views(m_session, m_displayTime, m_appSpace, views.size(),
+                          views.data())) {
+      return false;
+    }
+
+    for (int i = 0; i < views.size(); ++i) {
+      m_viewSurface[i]->view = views[i];
+    }
+
+    /* Acquire Stage Location (rerative to the View Location) */
+    XrSpaceLocation stageLoc{XR_TYPE_SPACE_LOCATION};
+    xrLocateSpace(m_stageSpace, m_appSpace, m_displayTime, &stageLoc);
+    *stagePose = stageLoc.pose;
+
+    return true;
+  }
+
+  void EndFrame() {
+    std::vector<XrCompositionLayerProjectionView> projLayerViews;
+    for (auto view : m_viewSurface) {
+      projLayerViews.push_back(view->projLayerView);
+    }
+
+    XrCompositionLayerProjection projLayer;
+    projLayer = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
+    projLayer.space = m_appSpace;
+    projLayer.viewCount = (uint32_t)projLayerViews.size();
+    projLayer.views = projLayerViews.data();
+
+    std::vector<XrCompositionLayerBaseHeader *> all_layers;
+    all_layers.push_back(
+        reinterpret_cast<XrCompositionLayerBaseHeader *>(&projLayer));
+
+    /* Compose all layers */
+    oxr_end_frame(m_session, m_displayTime, all_layers);
+  }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+/// XrApp
+///////////////////////////////////////////////////////////////////////////////
+XrApp::XrApp() : impl_(new XrAppImpl) {}
+XrApp::~XrApp() { delete impl_; }
+bool XrApp::CreateInstance(struct android_app *app) {
+  return impl_->CreateInstance(app);
 }
+bool XrApp::CreateGraphics() { return impl_->CreateGraphics(); }
+bool XrApp::CreateSession() { return impl_->CreateSession(); }
+bool XrApp::IsSessionRunning() const { return impl_->m_session_running; }
+void XrApp::Render(const RenderFunc &func) { return impl_->Render(func); }
