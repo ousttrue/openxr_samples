@@ -47,46 +47,6 @@ std::string oxr_get_runtime_name(XrInstance instance) {
   return runtime_name;
 }
 
-/* ----------------------------------------------------------------------------
- * * Get OpenXR Sysem
- * ----------------------------------------------------------------------------
- */
-XrSystemId oxr_get_system(XrInstance instance) {
-  XrSystemGetInfo sysInfo = {XR_TYPE_SYSTEM_GET_INFO};
-  sysInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-
-  XrSystemId sysid;
-  // OXR_CHECK(
-  xrGetSystem(instance, &sysInfo, &sysid);
-  // );
-
-  /* query system properties*/
-  XrSystemProperties prop = {XR_TYPE_SYSTEM_PROPERTIES};
-#if defined(USE_OXR_HANDTRACK)
-  XrSystemHandTrackingPropertiesEXT handTrackProp{
-      XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT};
-  prop.next = &handTrackProp;
-#endif
-  xrGetSystemProperties(instance, sysid, &prop);
-
-  LOGI("-----------------------------------------------------------------");
-  LOGI("System Properties         : Name=\"%s\", VendorId=%x", prop.systemName,
-       prop.vendorId);
-  LOGI("System Graphics Properties: SwapchainMaxWH=(%d, %d), MaxLayers=%d",
-       prop.graphicsProperties.maxSwapchainImageWidth,
-       prop.graphicsProperties.maxSwapchainImageHeight,
-       prop.graphicsProperties.maxLayerCount);
-  LOGI("System Tracking Properties: Orientation=%d, Position=%d",
-       prop.trackingProperties.orientationTracking,
-       prop.trackingProperties.positionTracking);
-#if defined(USE_OXR_HANDTRACK)
-  LOGI("System HandTracking Props : %d", handTrackProp.supportsHandTracking);
-#endif
-  LOGI("-----------------------------------------------------------------");
-
-  return sysid;
-}
-
 std::string oxr_get_system_name(XrInstance instance, XrSystemId sysid) {
   XrSystemProperties prop = {XR_TYPE_SYSTEM_PROPERTIES};
   xrGetSystemProperties(instance, sysid, &prop);
@@ -631,7 +591,7 @@ void AppEngine::oxr_check_errors(XrResult ret, const char *func,
  * * Initialize OpenXR with OpenGLES renderer
  * ----------------------------------------------------------------------------
  */
-void AppEngine::InitOpenXR_GLES(struct android_app *app) {
+void AppEngine::CreateInstance(struct android_app *app) {
   // initialize loader
   PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;
   xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
@@ -683,15 +643,41 @@ void AppEngine::InitOpenXR_GLES(struct android_app *app) {
           XR_MAX_ENGINE_NAME_SIZE - 1);
   OXR_CHECK(xrCreateInstance(&ci, &m_instance));
 
-  // query instance name, version
-  XrInstanceProperties prop = {.type = XR_TYPE_INSTANCE_PROPERTIES};
-  xrGetInstanceProperties(m_instance, &prop);
-  LOGI("OpenXR Instance Runtime   : \"%s\", Version: %u.%u.%u",
-       prop.runtimeName, XR_VERSION_MAJOR(prop.runtimeVersion),
-       XR_VERSION_MINOR(prop.runtimeVersion),
-       XR_VERSION_PATCH(prop.runtimeVersion));
+  // // query instance name, version
+  // XrInstanceProperties instanceProp = {.type = XR_TYPE_INSTANCE_PROPERTIES};
+  // xrGetInstanceProperties(m_instance, &instanceProp);
+  // LOGI("OpenXR Instance Runtime   : \"%s\", Version: %u.%u.%u",
+  //      instanceProp.runtimeName,
+  //      XR_VERSION_MAJOR(instanceProp.runtimeVersion),
+  //      XR_VERSION_MINOR(instanceProp.runtimeVersion),
+  //      XR_VERSION_PATCH(instanceProp.runtimeVersion));
 
-  m_systemId = oxr_get_system(m_instance);
+  XrSystemGetInfo sysInfo = {
+      .type = XR_TYPE_SYSTEM_GET_INFO,
+      .formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY,
+  };
+  OXR_CHECK(xrGetSystem(m_instance, &sysInfo, &m_systemId));
+
+  // // query system properties
+  // XrSystemProperties systemProp = {
+  //     .type = XR_TYPE_SYSTEM_PROPERTIES,
+  // };
+  // xrGetSystemProperties(m_instance, m_systemId, &systemProp);
+  // LOGI("-----------------------------------------------------------------");
+  // LOGI("System Properties         : Name=\"%s\", VendorId=%x",
+  // systemProp.systemName,
+  //      systemProp.vendorId);
+  // LOGI("System Graphics Properties: SwapchainMaxWH=(%d, %d), MaxLayers=%d",
+  //      systemProp.graphicsProperties.maxSwapchainImageWidth,
+  //      systemProp.graphicsProperties.maxSwapchainImageHeight,
+  //      systemProp.graphicsProperties.maxLayerCount);
+  // LOGI("System Tracking Properties: Orientation=%d, Position=%d",
+  //      systemProp.trackingProperties.orientationTracking,
+  //      systemProp.trackingProperties.positionTracking);
+  // LOGI("-----------------------------------------------------------------");
+}
+
+void AppEngine::CreateGraphics() {
   egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
   oxr_confirm_gfx_requirements(m_instance, m_systemId);
 }
@@ -711,7 +697,7 @@ void AppEngine::CreateSession() {
 bool AppEngine::UpdateFrame() {
   bool exit_loop, req_restart;
   oxr_poll_events(m_instance, m_session, &exit_loop, &req_restart);
-  if (!oxr_is_session_running()) {
+  if (!IsSessionRunning()) {
     return false;
   }
   return true;

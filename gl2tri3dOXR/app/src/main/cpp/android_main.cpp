@@ -58,7 +58,8 @@ void android_main(struct android_app *app) {
   app->onAppCmd = ProcessAndroidCmd;
 
   AppEngine engine;
-  engine.InitOpenXR_GLES(app);
+  engine.CreateInstance(app);
+  engine.CreateGraphics();
 
   Renderer renderer;
   renderer.init_gles_scene();
@@ -85,7 +86,7 @@ void android_main(struct android_app *app) {
       struct android_poll_source *source;
 
       int timeout = -1; // blocking
-      if (appState.Resumed || engine.oxr_is_session_running() || app->destroyRequested)
+      if (appState.Resumed || engine.IsSessionRunning() || app->destroyRequested)
         timeout = 0; // non blocking
 
       if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {

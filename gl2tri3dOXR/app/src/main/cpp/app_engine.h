@@ -39,34 +39,33 @@ struct viewsurface {
   void releaseSwapchain() const;
 };
 
-class AppEngine { 
+class AppEngine {
 
   XrInstance m_instance;
   XrSession m_session;
+  XrSystemId m_systemId;
+
   XrSessionState m_session_state = XR_SESSION_STATE_UNKNOWN;
   bool m_session_running = false;
 
   XrSpace m_appSpace;
   XrSpace m_stageSpace;
-  XrSystemId m_systemId;
   std::vector<viewsurface> m_viewSurface;
 
   XrTime m_displayTime;
 
-public:
-  // Interfaces to android application framework
-  // struct android_app *AndroidApp(void) const;
-
   void oxr_check_errors(XrResult ret, const char *func, const char *fname,
                         int line);
-  bool oxr_is_session_running() { return m_session_running; }
   int oxr_handle_session_state_changed(XrSession session,
                                        XrEventDataSessionStateChanged &ev,
                                        bool *exitLoop, bool *reqRestart);
   int oxr_poll_events(XrInstance instance, XrSession session, bool *exit_loop,
                       bool *req_restart);
 
-  void InitOpenXR_GLES(struct android_app *app);
+public:
+  bool IsSessionRunning() { return m_session_running; }
+  void CreateInstance(struct android_app *app);
+  void CreateGraphics();
   void CreateSession();
   bool UpdateFrame();
   bool BeginFrame(XrPosef *stagePose);
