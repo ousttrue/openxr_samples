@@ -1,43 +1,13 @@
 #pragma once
-#ifdef __ANDROID__
-#include <android/native_window.h>
-#include <android_native_app_glue.h>
-#include <jni.h>
-#include <sys/system_properties.h>
-#endif
-
-#include "util_egl.h"
-#include <GLES3/gl31.h>
-
-#include "util_render_target.h"
 #include <functional>
 #include <memory>
 #include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
-#include <openxr/openxr_reflection.h>
 #include <stdint.h>
 #include <vector>
 
 using RenderFunc = std::function<int(
     const XrPosef &stagePose, uint32_t fbo, int x, int y, int w, int h,
     const XrFovf &fov, const XrPosef &viewPose)>;
-
-struct viewsurface {
-  XrSwapchain swapchain;
-  uint32_t width;
-  uint32_t height;
-
-  XrView view;
-  XrCompositionLayerProjectionView projLayerView;
-
-  std::vector<std::shared_ptr<render_target>> backbuffers;
-
-  std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const;
-  void createBackbuffers();
-
-  std::shared_ptr<render_target> acquireSwapchain();
-  void releaseSwapchain() const;
-};
 
 class XrApp {
 
@@ -50,7 +20,7 @@ class XrApp {
 
   XrSpace m_appSpace;
   XrSpace m_stageSpace;
-  std::vector<viewsurface> m_viewSurface;
+  std::vector<std::shared_ptr<struct viewsurface>> m_viewSurface;
 
   XrTime m_displayTime;
 
@@ -66,8 +36,9 @@ class XrApp {
   // viewsurface *GetView(size_t i);
   void EndFrame();
   uint32_t SwapchainIndex() const;
+
 public:
-  bool IsSessionRunning() { return m_session_running; }
+  bool IsSessionRunning() const { return m_session_running; }
   void CreateInstance(struct android_app *app);
   void CreateGraphics();
   void CreateSession();

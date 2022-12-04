@@ -5,9 +5,28 @@
 #include "util_render_target.h"
 #include <GLES3/gl31.h>
 #include <array>
-#include <memory>
-#include <stdint.h>
+#include <assert.h>
+#include <openxr/openxr_platform.h>
+#include <openxr/openxr_reflection.h>
 #include <string>
+
+
+struct viewsurface {
+  XrSwapchain swapchain;
+  uint32_t width;
+  uint32_t height;
+
+  XrView view;
+  XrCompositionLayerProjectionView projLayerView;
+
+  std::vector<std::shared_ptr<render_target>> backbuffers;
+
+  std::vector<XrSwapchainImageOpenGLESKHR> getSwapchainImages() const;
+  void createBackbuffers();
+
+  std::shared_ptr<render_target> acquireSwapchain();
+  void releaseSwapchain() const;
+};
 
 #define OXR_CHECK(func) oxr_check_errors(func, #func, __FILE__, __LINE__);
 
@@ -550,24 +569,24 @@ static XrSwapchain oxr_create_swapchain(XrSession session, uint32_t width,
   return swapchain;
 }
 
-std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
-                                                XrSystemId sysid,
-                                                XrSession session) {
+static std::vector<std::shared_ptr<viewsurface>>
+oxr_create_viewsurface(XrInstance instance, XrSystemId sysid,
+                       XrSession session) {
   uint32_t viewCount;
   XrViewConfigurationView *conf_views =
       oxr_enumerate_viewconfig(instance, sysid, &viewCount);
 
-  std::vector<viewsurface> sfcArray;
+  std::vector<std::shared_ptr<viewsurface>> sfcArray;
   for (uint32_t i = 0; i < viewCount; i++) {
     auto &vp = conf_views[i];
     LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i,
          vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
          vp.recommendedSwapchainSampleCount);
 
-    viewsurface sfc;
-    sfc.width = vp.recommendedImageRectWidth;
-    sfc.height = vp.recommendedImageRectHeight;
-    sfc.swapchain = oxr_create_swapchain(session, sfc.width, sfc.height);
+    auto sfc = std::make_shared<viewsurface>();
+    sfc->width = vp.recommendedImageRectWidth;
+    sfc->height = vp.recommendedImageRectHeight;
+    sfc->swapchain = oxr_create_swapchain(session, sfc->width, sfc->height);
     sfcArray.push_back(sfc);
   }
   return sfcArray;
@@ -691,10 +710,10 @@ void XrApp::CreateSession() {
 
   // create backbuffer
   for (auto &view : m_viewSurface) {
-    view.createBackbuffers();
+    view->createBackbuffers();
     //   LOGI("SwapchainImage[%d/%d] FBO:%d, TEXC:%d, TEXZ:%d, WH(%d, %d)", i,
     //        imgCnt, rtarget->fbo_id, rtarget->texc_id, rtarget->texz_id,
-    //        sfc.width, sfc.height);
+    //        sfc->width, sfc->height);
   }
 }
 
@@ -749,7 +768,7 @@ bool XrApp::BeginFrame(XrPosef *stagePose) {
   }
 
   for (int i = 0; i < views.size(); ++i) {
-    m_viewSurface[i].view = views[i];
+    m_viewSurface[i]->view = views[i];
   }
 
   /* Acquire Stage Location (rerative to the View Location) */
@@ -763,7 +782,7 @@ bool XrApp::BeginFrame(XrPosef *stagePose) {
 void XrApp::EndFrame() {
   std::vector<XrCompositionLayerProjectionView> projLayerViews;
   for (auto view : m_viewSurface) {
-    projLayerViews.push_back(view.projLayerView);
+    projLayerViews.push_back(view->projLayerView);
   }
 
   XrCompositionLayerProjection projLayer;
@@ -785,14 +804,14 @@ void XrApp::Render(const RenderFunc &func) {
     XrPosef stagePose;
     if (BeginFrame(&stagePose)) {
       for (auto &view : m_viewSurface) {
-        auto renderTarget = view.acquireSwapchain();
-        int x = view.projLayerView.subImage.imageRect.offset.x;
-        int y = view.projLayerView.subImage.imageRect.offset.y;
-        int w = view.projLayerView.subImage.imageRect.extent.width;
-        int h = view.projLayerView.subImage.imageRect.extent.height;
+        auto renderTarget = view->acquireSwapchain();
+        int x = view->projLayerView.subImage.imageRect.offset.x;
+        int y = view->projLayerView.subImage.imageRect.offset.y;
+        int w = view->projLayerView.subImage.imageRect.extent.width;
+        int h = view->projLayerView.subImage.imageRect.extent.height;
         func(stagePose, renderTarget->fbo_id, x, y, w, h,
-             view.projLayerView.fov, view.projLayerView.pose);
-        view.releaseSwapchain();
+             view->projLayerView.fov, view->projLayerView.pose);
+        view->releaseSwapchain();
       }
       EndFrame();
     }

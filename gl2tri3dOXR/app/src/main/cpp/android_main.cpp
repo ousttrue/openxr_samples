@@ -1,8 +1,13 @@
 #include "XrApp.h"
-#include "openxr/openxr.h"
 #include "render_scene.h"
 #include "util_log.h"
-#include <functional>
+
+#ifdef __ANDROID__
+#include <android/native_window.h>
+#include <android_native_app_glue.h>
+#include <jni.h>
+#include <sys/system_properties.h>
+#endif
 
 struct AndroidAppState {
   ANativeWindow *NativeWindow = nullptr;
@@ -50,6 +55,29 @@ static void ProcessAndroidCmd(struct android_app *app, int32_t cmd) {
   }
 }
 
+static void process_android_event(struct android_app *app,
+                                  const AndroidAppState &appState,
+                                  const XrApp &xr) {
+  // Read all pending android events.
+  for (;;) {
+
+    int timeout = -1; // blocking
+    if (appState.Resumed || xr.IsSessionRunning() || app->destroyRequested) {
+      timeout = 0; // non blocking
+    }
+
+    int events;
+    struct android_poll_source *source;
+    if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {
+      break;
+    }
+
+    if (source != nullptr) {
+      source->process(app, source);
+    }
+  }
+}
+
 /*--------------------------------------------------------------------------- *
  *      M A I N    F U N C T I O N
  *--------------------------------------------------------------------------- */
@@ -68,23 +96,7 @@ void android_main(struct android_app *app) {
   xr.CreateSession();
 
   while (app->destroyRequested == 0) {
-    // Read all pending events.
-    for (;;) {
-      int events;
-      struct android_poll_source *source;
-
-      int timeout = -1; // blocking
-      if (appState.Resumed || xr.IsSessionRunning() || app->destroyRequested)
-        timeout = 0; // non blocking
-
-      if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {
-        break;
-      }
-
-      if (source != nullptr) {
-        source->process(app, source);
-      }
-    }
+    process_android_event(app, appState, xr);
 
     xr.Render(std::bind(&Renderer::render_gles_scene, &renderer,
                         std::placeholders::_1, std::placeholders::_2,
