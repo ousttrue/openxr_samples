@@ -100,68 +100,6 @@ struct viewsurface {
   }
 };
 
-static XrEventDataBuffer s_evDataBuf;
-
-static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
-                                             XrSession session) {
-  XrEventDataBaseHeader *ev =
-      reinterpret_cast<XrEventDataBaseHeader *>(&s_evDataBuf);
-  *ev = {XR_TYPE_EVENT_DATA_BUFFER};
-
-  XrResult xr = xrPollEvent(instance, &s_evDataBuf);
-  if (xr == XR_EVENT_UNAVAILABLE)
-    return nullptr;
-
-  if (xr != XR_SUCCESS) {
-    LOGE("xrPollEvent");
-    return NULL;
-  }
-
-  if (ev->type == XR_TYPE_EVENT_DATA_EVENTS_LOST) {
-    XrEventDataEventsLost *evLost =
-        reinterpret_cast<XrEventDataEventsLost *>(ev);
-    LOGW("%p events lost", evLost);
-  }
-  return ev;
-}
-
-/* ----------------------------------------------------------------------------
- * * View operation
- * ----------------------------------------------------------------------------
- */
-static XrViewConfigurationView *oxr_enumerate_viewconfig(XrInstance instance,
-                                                         XrSystemId sysid,
-                                                         uint32_t *numview) {
-  uint32_t numConf;
-  XrViewConfigurationView *conf;
-  XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-
-  xrEnumerateViewConfigurationViews(instance, sysid, viewType, 0, &numConf,
-                                    NULL);
-
-  conf = (XrViewConfigurationView *)calloc(sizeof(XrViewConfigurationView),
-                                           numConf);
-  for (uint32_t i = 0; i < numConf; i++)
-    conf[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
-
-  xrEnumerateViewConfigurationViews(instance, sysid, viewType, numConf,
-                                    &numConf, conf);
-
-  LOGI("ViewConfiguration num: %d", numConf);
-  for (uint32_t i = 0; i < numConf; i++) {
-    XrViewConfigurationView &vp = conf[i];
-    LOGI("ViewConfiguration[%d/%d]: MaxWH(%d, %d), MaxSample(%d)", i, numConf,
-         vp.maxImageRectWidth, vp.maxImageRectHeight,
-         vp.maxSwapchainSampleCount);
-    LOGI("                        RecWH(%d, %d), RecSample(%d)",
-         vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
-         vp.recommendedSwapchainSampleCount);
-  }
-
-  *numview = numConf;
-  return conf;
-}
-
 /* ----------------------------------------------------------------------------
  * * Swapchain operation
  * ----------------------------------------------------------------------------
@@ -202,13 +140,32 @@ static XrSwapchain oxr_create_swapchain(XrSession session, uint32_t width,
 static std::vector<std::shared_ptr<viewsurface>>
 oxr_create_viewsurface(XrInstance instance, XrSystemId sysid,
                        XrSession session) {
-  uint32_t viewCount;
-  XrViewConfigurationView *conf_views =
-      oxr_enumerate_viewconfig(instance, sysid, &viewCount);
+  uint32_t numConf;
+  XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+  xrEnumerateViewConfigurationViews(instance, sysid, viewType, 0, &numConf,
+                                    NULL);
+
+  std::vector<XrViewConfigurationView> conf(numConf);
+  for (uint32_t i = 0; i < numConf; i++){
+    conf[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+  }
+  xrEnumerateViewConfigurationViews(instance, sysid, viewType, numConf,
+                                    &numConf, conf.data());
+
+  LOGI("ViewConfiguration num: %d", numConf);
+  for (uint32_t i = 0; i < numConf; i++) {
+    XrViewConfigurationView &vp = conf[i];
+    LOGI("ViewConfiguration[%d/%d]: MaxWH(%d, %d), MaxSample(%d)", i, numConf,
+         vp.maxImageRectWidth, vp.maxImageRectHeight,
+         vp.maxSwapchainSampleCount);
+    LOGI("                        RecWH(%d, %d), RecSample(%d)",
+         vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
+         vp.recommendedSwapchainSampleCount);
+  }
 
   std::vector<std::shared_ptr<viewsurface>> sfcArray;
-  for (uint32_t i = 0; i < viewCount; i++) {
-    auto &vp = conf_views[i];
+  for (uint32_t i = 0; i < numConf; i++) {
+    auto &vp = conf[i];
     LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i,
          vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
          vp.recommendedSwapchainSampleCount);
@@ -260,6 +217,9 @@ struct XrAppImpl {
   std::vector<std::shared_ptr<struct viewsurface>> m_viewSurface;
 
   XrTime m_displayTime;
+
+  XrEventDataBuffer m_evDataBuf;
+
   void oxr_check_errors(XrResult ret, const char *func, const char *fname,
                         int line) {
     if (XR_FAILED(ret)) {
@@ -316,6 +276,29 @@ struct XrAppImpl {
       break;
     }
     return 0;
+  }
+
+  XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
+                                        XrSession session) {
+    XrEventDataBaseHeader *ev =
+        reinterpret_cast<XrEventDataBaseHeader *>(&m_evDataBuf);
+    *ev = {XR_TYPE_EVENT_DATA_BUFFER};
+
+    XrResult xr = xrPollEvent(instance, &m_evDataBuf);
+    if (xr == XR_EVENT_UNAVAILABLE)
+      return nullptr;
+
+    if (xr != XR_SUCCESS) {
+      LOGE("xrPollEvent");
+      return NULL;
+    }
+
+    if (ev->type == XR_TYPE_EVENT_DATA_EVENTS_LOST) {
+      XrEventDataEventsLost *evLost =
+          reinterpret_cast<XrEventDataEventsLost *>(ev);
+      LOGW("%p events lost", evLost);
+    }
+    return ev;
   }
 
   int oxr_poll_events(XrInstance instance, XrSession session, bool *exit_loop,
