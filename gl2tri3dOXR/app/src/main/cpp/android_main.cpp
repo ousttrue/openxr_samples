@@ -1,4 +1,4 @@
-#include "app_engine.h"
+#include "XrApp.h"
 #include "openxr/openxr.h"
 #include "render_scene.h"
 #include "util_log.h"
@@ -57,18 +57,18 @@ void android_main(struct android_app *app) {
   app->userData = &appState;
   app->onAppCmd = ProcessAndroidCmd;
 
-  AppEngine engine;
-  engine.CreateInstance(app);
-  engine.CreateGraphics();
+  XrApp xr;
+  xr.CreateInstance(app);
+  xr.CreateGraphics();
 
   Renderer renderer;
   renderer.init_gles_scene();
 
-  engine.CreateSession();
+  xr.CreateSession();
 
   // create backbuffer
   for (int i = 0;; ++i) {
-    auto view = engine.GetView(i);
+    auto view = xr.GetView(i);
     if (!view) {
       break;
     }
@@ -86,7 +86,7 @@ void android_main(struct android_app *app) {
       struct android_poll_source *source;
 
       int timeout = -1; // blocking
-      if (appState.Resumed || engine.IsSessionRunning() || app->destroyRequested)
+      if (appState.Resumed || xr.IsSessionRunning() || app->destroyRequested)
         timeout = 0; // non blocking
 
       if (ALooper_pollAll(timeout, nullptr, &events, (void **)&source) < 0) {
@@ -98,11 +98,11 @@ void android_main(struct android_app *app) {
       }
     }
 
-    if (engine.UpdateFrame()) {
+    if (xr.UpdateFrame()) {
       XrPosef stagePose;
-      if (engine.BeginFrame(&stagePose)) {
+      if (xr.BeginFrame(&stagePose)) {
         for (int i = 0;; ++i) {
-          auto view = engine.GetView(i);
+          auto view = xr.GetView(i);
           if (!view) {
             break;
           }
@@ -117,7 +117,7 @@ void android_main(struct android_app *app) {
                                      view->projLayerView.pose);
           view->releaseSwapchain();
         }
-        engine.EndFrame();
+        xr.EndFrame();
       }
     }
   }

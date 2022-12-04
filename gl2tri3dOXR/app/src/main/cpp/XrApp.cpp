@@ -1,4 +1,4 @@
-#include "app_engine.h"
+#include "XrApp.h"
 #include "android_native_app_glue.h"
 #include "util_egl.h"
 #include "util_log.h"
@@ -315,7 +315,7 @@ int oxr_begin_session(XrSession session) {
   return 0;
 }
 
-int AppEngine::oxr_handle_session_state_changed(
+int XrApp::oxr_handle_session_state_changed(
     XrSession session, XrEventDataSessionStateChanged &ev, bool *exitLoop,
     bool *reqRestart) {
   XrSessionState old_state = m_session_state;
@@ -383,7 +383,7 @@ static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
   return ev;
 }
 
-int AppEngine::oxr_poll_events(XrInstance instance, XrSession session,
+int XrApp::oxr_poll_events(XrInstance instance, XrSession session,
                                bool *exit_loop, bool *req_restart) {
   *exit_loop = false;
   *req_restart = false;
@@ -577,7 +577,7 @@ std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
  * * Error handling
  * ----------------------------------------------------------------------------
  */
-void AppEngine::oxr_check_errors(XrResult ret, const char *func,
+void XrApp::oxr_check_errors(XrResult ret, const char *func,
                                  const char *fname, int line) {
   if (XR_FAILED(ret)) {
     char errbuf[XR_MAX_RESULT_STRING_SIZE];
@@ -591,7 +591,7 @@ void AppEngine::oxr_check_errors(XrResult ret, const char *func,
  * * Initialize OpenXR with OpenGLES renderer
  * ----------------------------------------------------------------------------
  */
-void AppEngine::CreateInstance(struct android_app *app) {
+void XrApp::CreateInstance(struct android_app *app) {
   // initialize loader
   PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;
   xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
@@ -677,12 +677,12 @@ void AppEngine::CreateInstance(struct android_app *app) {
   // LOGI("-----------------------------------------------------------------");
 }
 
-void AppEngine::CreateGraphics() {
+void XrApp::CreateGraphics() {
   egl_init_with_pbuffer_surface(3, 24, 0, 0, 16, 16);
   oxr_confirm_gfx_requirements(m_instance, m_systemId);
 }
 
-void AppEngine::CreateSession() {
+void XrApp::CreateSession() {
   m_session = oxr_create_session(m_instance, m_systemId);
   m_appSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_LOCAL);
   m_stageSpace = oxr_create_ref_space(m_session, XR_REFERENCE_SPACE_TYPE_STAGE);
@@ -694,7 +694,7 @@ void AppEngine::CreateSession() {
  * * Update  Frame (Event handle, Render)
  * ------------------------------------------------------------------------------------
  */
-bool AppEngine::UpdateFrame() {
+bool XrApp::UpdateFrame() {
   bool exit_loop, req_restart;
   oxr_poll_events(m_instance, m_session, &exit_loop, &req_restart);
   if (!IsSessionRunning()) {
@@ -729,7 +729,7 @@ static bool oxr_locate_views(XrSession session, XrTime dpy_time, XrSpace space,
   return true;
 }
 
-bool AppEngine::BeginFrame(XrPosef *stagePose) {
+bool XrApp::BeginFrame(XrPosef *stagePose) {
   oxr_begin_frame(m_session, &m_displayTime);
 
   /* Acquire View Location */
@@ -752,7 +752,7 @@ bool AppEngine::BeginFrame(XrPosef *stagePose) {
   return true;
 }
 
-void AppEngine::EndFrame() {
+void XrApp::EndFrame() {
   std::vector<XrCompositionLayerProjectionView> projLayerViews;
   for (auto view : m_viewSurface) {
     projLayerViews.push_back(view.projLayerView);
@@ -772,7 +772,7 @@ void AppEngine::EndFrame() {
   oxr_end_frame(m_session, m_displayTime, all_layers);
 }
 
-viewsurface *AppEngine::GetView(size_t i) {
+viewsurface *XrApp::GetView(size_t i) {
   if (i >= m_viewSurface.size()) {
     return nullptr;
   }

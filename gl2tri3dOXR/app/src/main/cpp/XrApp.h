@@ -39,7 +39,7 @@ struct viewsurface {
   void releaseSwapchain() const;
 };
 
-class AppEngine {
+class XrApp {
 
   XrInstance m_instance;
   XrSession m_session;
@@ -74,4 +74,4 @@ public:
   uint32_t SwapchainIndex() const;
 };
 
-AppEngine *GetAppEngine(void);
+XrApp *GetAppEngine(void);

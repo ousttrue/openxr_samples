@@ -56,7 +56,7 @@ set_property(
 add_library(
   openxr_app SHARED
   android_main.cpp
-  app_engine.cpp
+  XrApp.cpp
   render_scene.cpp
   common/util_egl.c
   common/util_shader.c
