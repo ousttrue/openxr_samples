@@ -39,8 +39,7 @@ struct viewsurface {
   void releaseSwapchain() const;
 };
 
-class AppEngine {
-  struct android_app *m_app;
+class AppEngine { 
 
   XrInstance m_instance;
   XrSession m_session;
@@ -55,11 +54,8 @@ class AppEngine {
   XrTime m_displayTime;
 
 public:
-  explicit AppEngine(android_app *app);
-  ~AppEngine();
-
   // Interfaces to android application framework
-  struct android_app *AndroidApp(void) const;
+  // struct android_app *AndroidApp(void) const;
 
   void oxr_check_errors(XrResult ret, const char *func, const char *fname,
                         int line);
@@ -70,7 +66,7 @@ public:
   int oxr_poll_events(XrInstance instance, XrSession session, bool *exit_loop,
                       bool *req_restart);
 
-  void InitOpenXR_GLES();
+  void InitOpenXR_GLES(struct android_app *app);
   void CreateSession();
   bool UpdateFrame();
   bool BeginFrame(XrPosef *stagePose);

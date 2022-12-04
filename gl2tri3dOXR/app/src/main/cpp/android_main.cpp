@@ -57,8 +57,8 @@ void android_main(struct android_app *app) {
   app->userData = &appState;
   app->onAppCmd = ProcessAndroidCmd;
 
-  AppEngine engine(app);
-  engine.InitOpenXR_GLES();
+  AppEngine engine;
+  engine.InitOpenXR_GLES(app);
 
   Renderer renderer;
   renderer.init_gles_scene();

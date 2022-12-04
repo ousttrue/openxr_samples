@@ -1,8 +1,10 @@
 #include "app_engine.h"
+#include "android_native_app_glue.h"
 #include "util_egl.h"
 #include "util_log.h"
 #include "util_render_target.h"
 #include <GLES3/gl31.h>
+#include <array>
 #include <memory>
 #include <stdint.h>
 #include <string>
@@ -422,7 +424,7 @@ static XrEventDataBaseHeader *oxr_poll_event(XrInstance instance,
 }
 
 int AppEngine::oxr_poll_events(XrInstance instance, XrSession session,
-                             bool *exit_loop, bool *req_restart) {
+                               bool *exit_loop, bool *req_restart) {
   *exit_loop = false;
   *req_restart = false;
 
@@ -611,16 +613,6 @@ std::vector<viewsurface> oxr_create_viewsurface(XrInstance instance,
   return sfcArray;
 }
 
-AppEngine::AppEngine(android_app *app) : m_app(app) {}
-
-AppEngine::~AppEngine() {}
-
-/* ----------------------------------------------------------------------------
- * * Interfaces to android application framework
- * ----------------------------------------------------------------------------
- */
-struct android_app *AppEngine::AndroidApp(void) const { return m_app; }
-
 /* ----------------------------------------------------------------------------
  * * Error handling
  * ----------------------------------------------------------------------------
@@ -639,41 +631,44 @@ void AppEngine::oxr_check_errors(XrResult ret, const char *func,
  * * Initialize OpenXR with OpenGLES renderer
  * ----------------------------------------------------------------------------
  */
-void AppEngine::InitOpenXR_GLES() {
+void AppEngine::InitOpenXR_GLES(struct android_app *app) {
   // initialize loader
   PFN_xrInitializeLoaderKHR xrInitializeLoaderKHR;
   xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrInitializeLoaderKHR",
                         (PFN_xrVoidFunction *)&xrInitializeLoaderKHR);
   XrLoaderInitInfoAndroidKHR info = {
       .type = XR_TYPE_LOADER_INIT_INFO_ANDROID_KHR,
-      .applicationVM = m_app->activity->vm,
-      .applicationContext = m_app->activity->clazz,
+      .applicationVM = app->activity->vm,
+      .applicationContext = app->activity->clazz,
   };
   OXR_CHECK(xrInitializeLoaderKHR((XrLoaderInitInfoBaseHeaderKHR *)&info));
 
   // enumerate extension properties
-  uint32_t ext_count = 0;
-  OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL));
-  XrExtensionProperties extProps[ext_count];
-  for (uint32_t i = 0; i < ext_count; i++) {
-    extProps[i].type = XR_TYPE_EXTENSION_PROPERTIES;
-    extProps[i].next = NULL;
-  }
-  OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count,
-                                                   extProps));
-  for (uint32_t i = 0; i < ext_count; i++) {
-    LOGI("InstanceExt[%2d/%2d]: %s\n", i, ext_count, extProps[i].extensionName);
-  }
+  // uint32_t ext_count = 0;
+  // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count,
+  // NULL)); XrExtensionProperties extProps[ext_count]; for (uint32_t i = 0; i <
+  // ext_count; i++) {
+  //   extProps[i].type = XR_TYPE_EXTENSION_PROPERTIES;
+  //   extProps[i].next = NULL;
+  // }
+  // OXR_CHECK(xrEnumerateInstanceExtensionProperties(NULL, ext_count,
+  // &ext_count,
+  //                                                  extProps));
+  // for (uint32_t i = 0; i < ext_count; i++) {
+  //   LOGI("InstanceExt[%2d/%2d]: %s\n", i, ext_count,
+  //   extProps[i].extensionName);
+  // }
 
   // create instance
   XrInstanceCreateInfoAndroidKHR ciAndroid = {
       .type = XR_TYPE_INSTANCE_CREATE_INFO_ANDROID_KHR,
-      .applicationVM = m_app->activity->vm,
-      .applicationActivity = m_app->activity->clazz,
+      .applicationVM = app->activity->vm,
+      .applicationActivity = app->activity->clazz,
   };
-  std::vector<const char *> extensions;
-  extensions.push_back("XR_KHR_android_create_instance");
-  extensions.push_back("XR_KHR_opengl_es_enable");
+  std::array<const char *, 2> extensions = {
+      "XR_KHR_android_create_instance",
+      "XR_KHR_opengl_es_enable",
+  };
   XrInstanceCreateInfo ci = {
       .type = XR_TYPE_INSTANCE_CREATE_INFO,
       .next = &ciAndroid,
