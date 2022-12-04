@@ -100,32 +100,6 @@ struct viewsurface {
   }
 };
 
-/* ------------------------------------------------------------------------------------
- * * RenderFrame (Frame/Layer/View)
- * ------------------------------------------------------------------------------------
- */
-static bool oxr_locate_views(XrSession session, XrTime dpy_time, XrSpace space,
-                             uint32_t view_cnt, XrView *view_array) {
-  XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-
-  XrViewState viewstat = {XR_TYPE_VIEW_STATE};
-  uint32_t view_cnt_in = view_cnt;
-  uint32_t view_cnt_out;
-
-  XrViewLocateInfo vloc = {XR_TYPE_VIEW_LOCATE_INFO};
-  vloc.viewConfigurationType = viewType;
-  vloc.displayTime = dpy_time;
-  vloc.space = space;
-  xrLocateViews(session, &vloc, &viewstat, view_cnt_in, &view_cnt_out,
-                view_array);
-
-  if ((viewstat.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) == 0 ||
-      (viewstat.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0) {
-    return false; // There is no valid tracking poses for the views.
-  }
-  return true;
-}
-
 struct XrAppImpl {
   XrInstance m_instance;
   XrSession m_session;
@@ -569,16 +543,30 @@ struct XrAppImpl {
     // Acquire View Location
     std::vector<XrView> views(m_viewSurface.size());
 
-    if (!oxr_locate_views(m_session, m_displayTime, m_appSpace, views.size(),
-                          views.data())) {
+    XrViewConfigurationType viewType =
+        XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+
+    XrViewState viewstat = {.type = XR_TYPE_VIEW_STATE};
+    uint32_t view_cnt_out;
+    XrViewLocateInfo vloc = {
+        .type = XR_TYPE_VIEW_LOCATE_INFO,
+        .viewConfigurationType = viewType,
+        .displayTime = m_displayTime,
+        .space = m_appSpace,
+    };
+    if (XR_FAILED(xrLocateViews(m_session, &vloc, &viewstat, views.size(),
+                                &view_cnt_out, views.data()))) {
       return false;
     }
-
+    if ((viewstat.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) == 0 ||
+        (viewstat.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT) == 0) {
+      return false; // There is no valid tracking poses for the views.
+    }
     for (int i = 0; i < views.size(); ++i) {
       m_viewSurface[i]->view = views[i];
     }
 
-    /* Acquire Stage Location (rerative to the View Location) */
+    // Acquire Stage Location (rerative to the View Location)
     XrSpaceLocation stageLoc{XR_TYPE_SPACE_LOCATION};
     xrLocateSpace(m_stageSpace, m_appSpace, m_displayTime, &stageLoc);
     *stagePose = stageLoc.pose;
