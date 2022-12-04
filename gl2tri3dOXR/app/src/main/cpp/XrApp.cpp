@@ -101,36 +101,10 @@ struct viewsurface {
 };
 
 /* ----------------------------------------------------------------------------
- * * Create OpenXR Instance with Android/OpenGLES binding
- * ----------------------------------------------------------------------------
- */
-
-std::string oxr_get_runtime_name(XrInstance instance) {
-  XrInstanceProperties prop = {XR_TYPE_INSTANCE_PROPERTIES};
-  xrGetInstanceProperties(instance, &prop);
-
-  char strbuf[128];
-  snprintf(strbuf, 127, "%s (%u.%u.%u)", prop.runtimeName,
-           XR_VERSION_MAJOR(prop.runtimeVersion),
-           XR_VERSION_MINOR(prop.runtimeVersion),
-           XR_VERSION_PATCH(prop.runtimeVersion));
-  std::string runtime_name = strbuf;
-  return runtime_name;
-}
-
-std::string oxr_get_system_name(XrInstance instance, XrSystemId sysid) {
-  XrSystemProperties prop = {XR_TYPE_SYSTEM_PROPERTIES};
-  xrGetSystemProperties(instance, sysid, &prop);
-
-  std::string sys_name = prop.systemName;
-  return sys_name;
-}
-
-/* ----------------------------------------------------------------------------
  * * Frame operation
  * ----------------------------------------------------------------------------
  */
-int oxr_begin_frame(XrSession session, XrTime *dpy_time) {
+static int oxr_begin_frame(XrSession session, XrTime *dpy_time) {
   XrFrameWaitInfo frameWait = {XR_TYPE_FRAME_WAIT_INFO};
   XrFrameState frameState = {XR_TYPE_FRAME_STATE};
   xrWaitFrame(session, &frameWait, &frameState);
@@ -142,7 +116,7 @@ int oxr_begin_frame(XrSession session, XrTime *dpy_time) {
   return (int)frameState.shouldRender;
 }
 
-int oxr_end_frame(XrSession session, XrTime dpy_time,
+static int oxr_end_frame(XrSession session, XrTime dpy_time,
                   std::vector<XrCompositionLayerBaseHeader *> &layers) {
   XrFrameEndInfo frameEnd{XR_TYPE_FRAME_END_INFO};
   frameEnd.displayTime = dpy_time;
@@ -158,7 +132,7 @@ int oxr_end_frame(XrSession session, XrTime dpy_time,
  * * Space operation
  * ----------------------------------------------------------------------------
  */
-XrSpace oxr_create_ref_space(XrSession session,
+static XrSpace oxr_create_ref_space(XrSession session,
                              XrReferenceSpaceType ref_space_type) {
   XrSpace space;
   XrReferenceSpaceCreateInfo ci = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
@@ -169,164 +143,12 @@ XrSpace oxr_create_ref_space(XrSession session,
   return space;
 }
 
-XrSpace oxr_create_action_space(XrSession session, XrAction action,
-                                XrPath subpath) {
-  XrSpace space;
-  XrActionSpaceCreateInfo ci = {XR_TYPE_ACTION_SPACE_CREATE_INFO};
-  ci.action = action;
-  ci.poseInActionSpace.orientation.w = 1.0f;
-  ci.subactionPath = subpath;
-  xrCreateActionSpace(session, &ci, &space);
-
-  return space;
-}
-
-/* ----------------------------------------------------------------------------
- * * Action operation
- * ----------------------------------------------------------------------------
- */
-XrActionSet oxr_create_actionset(XrInstance instance, const char *name,
-                                 const char *local_name, int priority) {
-  XrActionSet actionset;
-  XrActionSetCreateInfo ci = {XR_TYPE_ACTION_SET_CREATE_INFO};
-  ci.priority = priority;
-  strcpy(ci.actionSetName, name);
-  strcpy(ci.localizedActionSetName, local_name);
-  xrCreateActionSet(instance, &ci, &actionset);
-
-  return actionset;
-}
-
-XrAction oxr_create_action(XrActionSet actionset, XrActionType type,
-                           const char *name, const char *local_name,
-                           int subpath_num, XrPath *subpath_array) {
-  XrAction action;
-  XrActionCreateInfo ci = {XR_TYPE_ACTION_CREATE_INFO};
-  ci.actionType = type;
-  ci.countSubactionPaths = subpath_num;
-  ci.subactionPaths = subpath_array;
-  strncpy(ci.actionName, name, XR_MAX_ACTION_NAME_SIZE);
-  strncpy(ci.localizedActionName, local_name,
-          XR_MAX_LOCALIZED_ACTION_NAME_SIZE);
-  xrCreateAction(actionset, &ci, &action);
-
-  return action;
-}
-
-XrPath oxr_str2path(XrInstance instance, const char *str) {
-  XrPath path;
-  xrStringToPath(instance, str, &path);
-  return path;
-}
-
-int oxr_bind_interaction(XrInstance instance, const char *profile,
-                         std::vector<XrActionSuggestedBinding> &bindings) {
-  XrPath profPath;
-  xrStringToPath(instance, profile, &profPath);
-
-  XrInteractionProfileSuggestedBinding bind{
-      XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
-  bind.interactionProfile = profPath;
-  bind.suggestedBindings = bindings.data();
-  bind.countSuggestedBindings = (uint32_t)bindings.size();
-
-  xrSuggestInteractionProfileBindings(instance, &bind);
-
-  return 0;
-}
-
-int oxr_attach_actionsets(XrSession session, XrActionSet actionSet) {
-  XrSessionActionSetsAttachInfo info{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
-  info.countActionSets = 1;
-  info.actionSets = &actionSet;
-  xrAttachSessionActionSets(session, &info);
-
-  return 0;
-}
-
-int oxr_sync_actions(XrSession session, XrActionSet actionSet) {
-  const XrActiveActionSet activeActionSet{actionSet, XR_NULL_PATH};
-
-  XrActionsSyncInfo syncInfo{XR_TYPE_ACTIONS_SYNC_INFO};
-  syncInfo.countActiveActionSets = 1;
-  syncInfo.activeActionSets = &activeActionSet;
-  xrSyncActions(session, &syncInfo);
-
-  return 0;
-}
-
-XrActionStateBoolean oxr_get_action_state_boolean(XrSession session,
-                                                  XrAction action,
-                                                  XrPath subpath) {
-  XrActionStateGetInfo getInfo{XR_TYPE_ACTION_STATE_GET_INFO};
-  getInfo.action = action;
-  getInfo.subactionPath = subpath;
-
-  XrActionStateBoolean stat{XR_TYPE_ACTION_STATE_BOOLEAN};
-  xrGetActionStateBoolean(session, &getInfo, &stat);
-
-  return stat;
-}
-
-XrActionStateFloat oxr_get_action_state_float(XrSession session,
-                                              XrAction action, XrPath subpath) {
-  XrActionStateGetInfo getInfo{XR_TYPE_ACTION_STATE_GET_INFO};
-  getInfo.action = action;
-  getInfo.subactionPath = subpath;
-
-  XrActionStateFloat stat{XR_TYPE_ACTION_STATE_FLOAT};
-  xrGetActionStateFloat(session, &getInfo, &stat);
-
-  return stat;
-}
-
-XrActionStatePose oxr_get_action_state_pose(XrSession session, XrAction action,
-                                            XrPath subpath) {
-  XrActionStateGetInfo getInfo{XR_TYPE_ACTION_STATE_GET_INFO};
-  getInfo.action = action;
-  getInfo.subactionPath = subpath;
-
-  XrActionStatePose stat{XR_TYPE_ACTION_STATE_POSE};
-  xrGetActionStatePose(session, &getInfo, &stat);
-
-  return stat;
-}
-
-XrActionStateVector2f oxr_get_action_state_vector2(XrSession session,
-                                                   XrAction action,
-                                                   XrPath subpath) {
-  XrActionStateGetInfo getInfo = {XR_TYPE_ACTION_STATE_GET_INFO};
-  getInfo.action = action;
-  getInfo.subactionPath = subpath;
-
-  XrActionStateVector2f stat = {XR_TYPE_ACTION_STATE_VECTOR2F};
-  xrGetActionStateVector2f(session, &getInfo, &stat);
-
-  return stat;
-}
-
-int oxr_apply_haptic_feedback_vibrate(XrSession session, XrAction action,
-                                      XrPath subpath, XrDuration dura,
-                                      float freq, float amp) {
-  XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
-  vibration.duration = dura;
-  vibration.frequency = freq;
-  vibration.amplitude = amp;
-
-  XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
-  info.action = action;
-  info.subactionPath = subpath;
-  xrApplyHapticFeedback(session, &info, (XrHapticBaseHeader *)&vibration);
-
-  return 0;
-}
-
 /* ----------------------------------------------------------------------------
  * * Session operation
  * ----------------------------------------------------------------------------
  */
 
-XrSession oxr_create_session(XrInstance instance, XrSystemId sysid) {
+static XrSession oxr_create_session(XrInstance instance, XrSystemId sysid) {
   XrGraphicsBindingOpenGLESAndroidKHR gfxBind = {
       XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR};
   gfxBind.display = egl_get_display();
@@ -343,7 +165,7 @@ XrSession oxr_create_session(XrInstance instance, XrSystemId sysid) {
   return session;
 }
 
-int oxr_begin_session(XrSession session) {
+static int oxr_begin_session(XrSession session) {
   XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 
   XrSessionBeginInfo bi{XR_TYPE_SESSION_BEGIN_INFO};
