@@ -1,6 +1,7 @@
 #include "XrApp.h"
 #include "render_scene.h"
 #include "util_log.h"
+#include <functional>
 
 #ifdef __ANDROID__
 #include <android/native_window.h>
@@ -87,21 +88,24 @@ void android_main(struct android_app *app) {
   app->onAppCmd = ProcessAndroidCmd;
 
   XrApp xr;
-  xr.CreateInstance(app);
-  xr.CreateGraphics();
+  if (!xr.CreateInstance(app)) {
+    return;
+  }
+  if (!xr.CreateGraphics()) {
+    return;
+  }
 
   Renderer renderer;
   renderer.init_gles_scene();
 
-  xr.CreateSession();
+  if (!xr.CreateSession()) {
+    return;
+  }
 
   while (app->destroyRequested == 0) {
     process_android_event(app, appState, xr);
 
     xr.Render(std::bind(&Renderer::render_gles_scene, &renderer,
-                        std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3, std::placeholders::_4,
-                        std::placeholders::_5, std::placeholders::_6,
-                        std::placeholders::_7, std::placeholders::_8));
+                        std::placeholders::_1, std::placeholders::_2));
   }
 }

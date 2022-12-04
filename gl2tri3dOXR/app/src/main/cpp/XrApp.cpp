@@ -26,6 +26,8 @@
     }                                                                          \
   }
 
+static_assert(sizeof(XrPosef) == sizeof(render_interface::pose), "pose");
+
 MAKE_TO_STRING_FUNC(XrReferenceSpaceType);
 MAKE_TO_STRING_FUNC(XrViewConfigurationType);
 MAKE_TO_STRING_FUNC(XrEnvironmentBlendMode);
@@ -777,18 +779,23 @@ struct XrAppImpl {
     return true;
   }
 
+  render_interface::ViewInfo info_;
+
   void Render(const RenderFunc &func) {
     if (UpdateFrame()) {
-      XrPosef stagePose;
-      if (BeginFrame(&stagePose)) {
+      if (BeginFrame((XrPosef *)&info_.stage)) {
         for (auto &view : m_viewSurface) {
+          info_.view = *((render_interface::pose *)&view->projLayerView.pose);
+          info_.projection =
+              *((render_interface::projection *)&view->projLayerView.fov);
           auto renderTarget = view->acquireSwapchain();
-          int x = view->projLayerView.subImage.imageRect.offset.x;
-          int y = view->projLayerView.subImage.imageRect.offset.y;
-          int w = view->projLayerView.subImage.imageRect.extent.width;
-          int h = view->projLayerView.subImage.imageRect.extent.height;
-          func(stagePose, renderTarget->fbo_id, x, y, w, h,
-               view->projLayerView.fov, view->projLayerView.pose);
+          info_.viewport.x = view->projLayerView.subImage.imageRect.offset.x;
+          info_.viewport.y = view->projLayerView.subImage.imageRect.offset.y;
+          info_.viewport.width =
+              view->projLayerView.subImage.imageRect.extent.width;
+          info_.viewport.height =
+              view->projLayerView.subImage.imageRect.extent.height;
+          func(renderTarget->fbo_id, info_);
           view->releaseSwapchain();
         }
         EndFrame();

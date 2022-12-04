@@ -1,4 +1,5 @@
 #include "render_scene.h"
+#include "openxr/openxr.h"
 #include "util_debugstr.h"
 #include "util_egl.h"
 #include "util_matrix.h"
@@ -113,15 +114,13 @@ int Renderer::draw_triangle(float *matStage) {
   return 0;
 }
 
-int Renderer::render_gles_scene(const XrPosef &stagePose, uint32_t fbo, int x,
-                                int y, int width, int height, const XrFovf &fov,
-                                const XrPosef &viewPose) {
+void Renderer::render_gles_scene(unsigned int fbo,
+                                 const render_interface::ViewInfo &info) {
 
   assert(fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-  glViewport(x, y, width, height);
-
+  glViewport(info.viewport.x, info.viewport.y, info.viewport.width,
+             info.viewport.height);
   glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -133,19 +132,22 @@ int Renderer::render_gles_scene(const XrPosef &stagePose, uint32_t fbo, int x,
   XrMatrix4x4f matP, matV, matC, matM, matPV, matPVM;
 
   /* Projection Matrix */
+  XrFovf fov = *((XrFovf *)&info.projection);
   XrMatrix4x4f_CreateProjectionFov(&matP, GRAPHICS_OPENGL_ES, fov, 0.05f,
                                    100.0f);
 
   /* View Matrix (inverse of Camera matrix) */
   XrVector3f scale = {1.0f, 1.0f, 1.0f};
-  const auto &vewPose = viewPose;
-  XrMatrix4x4f_CreateTranslationRotationScale(&matC, &vewPose.position,
-                                              &vewPose.orientation, &scale);
+
+  XrMatrix4x4f_CreateTranslationRotationScale(
+      &matC, (const XrVector3f *)&info.view.position,
+      (const XrQuaternionf *)&info.view.rotation, &scale);
   XrMatrix4x4f_InvertRigidBody(&matV, &matC);
 
   /* Stage Space Matrix */
-  XrMatrix4x4f_CreateTranslationRotationScale(&matM, &stagePose.position,
-                                              &stagePose.orientation, &scale);
+  XrMatrix4x4f_CreateTranslationRotationScale(
+      &matM, (const XrVector3f *)&info.stage.position,
+      (const XrQuaternionf *)&info.stage.rotation, &scale);
 
   XrMatrix4x4f_Multiply(&matPV, &matP, &matV);
   XrMatrix4x4f_Multiply(&matPVM, &matPV, &matM);
@@ -185,6 +187,4 @@ int Renderer::render_gles_scene(const XrPosef &stagePose, uint32_t fbo, int x,
   //   }
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-  return 0;
 }

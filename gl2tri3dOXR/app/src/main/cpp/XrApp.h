@@ -1,5 +1,9 @@
 #pragma once
-#include "RenderFunc.h"
+#include "render_interface.h"
+#include <functional>
+
+using RenderFunc =
+    std::function<void(unsigned int, const render_interface::ViewInfo)>;
 
 class XrApp {
 
