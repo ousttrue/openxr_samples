@@ -100,85 +100,6 @@ struct viewsurface {
   }
 };
 
-/* ----------------------------------------------------------------------------
- * * Swapchain operation
- * ----------------------------------------------------------------------------
- * *
- *
- *  --+-- view[0] -- viewSurface[0]
- *    |
- *    +-- view[1] -- viewSurface[1]
- *                   +----------------------------------------------+
- *                   | uint32_t    width, height                    |
- *                   | XrSwapchain swapchain                        |
- *                   | rtarget_array[0]: (fbo_id, texc_id, texz_id) |
- *                   | rtarget_array[1]: (fbo_id, texc_id, texz_id) |
- *                   | rtarget_array[2]: (fbo_id, texc_id, texz_id) |
- *                   +----------------------------------------------+
- *
- * ----------------------------------------------------------------------------
- */
-static XrSwapchain oxr_create_swapchain(XrSession session, uint32_t width,
-                                        uint32_t height) {
-  XrSwapchainCreateInfo ci = {XR_TYPE_SWAPCHAIN_CREATE_INFO};
-  ci.usageFlags =
-      XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
-  ci.format = GL_RGBA8;
-  ci.width = width;
-  ci.height = height;
-  ci.faceCount = 1;
-  ci.arraySize = 1;
-  ci.mipCount = 1;
-  ci.sampleCount = 1;
-
-  XrSwapchain swapchain;
-  xrCreateSwapchain(session, &ci, &swapchain);
-
-  return swapchain;
-}
-
-static std::vector<std::shared_ptr<viewsurface>>
-oxr_create_viewsurface(XrInstance instance, XrSystemId sysid,
-                       XrSession session) {
-  uint32_t numConf;
-  XrViewConfigurationType viewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-  xrEnumerateViewConfigurationViews(instance, sysid, viewType, 0, &numConf,
-                                    NULL);
-
-  std::vector<XrViewConfigurationView> conf(numConf);
-  for (uint32_t i = 0; i < numConf; i++){
-    conf[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
-  }
-  xrEnumerateViewConfigurationViews(instance, sysid, viewType, numConf,
-                                    &numConf, conf.data());
-
-  LOGI("ViewConfiguration num: %d", numConf);
-  for (uint32_t i = 0; i < numConf; i++) {
-    XrViewConfigurationView &vp = conf[i];
-    LOGI("ViewConfiguration[%d/%d]: MaxWH(%d, %d), MaxSample(%d)", i, numConf,
-         vp.maxImageRectWidth, vp.maxImageRectHeight,
-         vp.maxSwapchainSampleCount);
-    LOGI("                        RecWH(%d, %d), RecSample(%d)",
-         vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
-         vp.recommendedSwapchainSampleCount);
-  }
-
-  std::vector<std::shared_ptr<viewsurface>> sfcArray;
-  for (uint32_t i = 0; i < numConf; i++) {
-    auto &vp = conf[i];
-    LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i,
-         vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
-         vp.recommendedSwapchainSampleCount);
-
-    auto sfc = std::make_shared<viewsurface>();
-    sfc->width = vp.recommendedImageRectWidth;
-    sfc->height = vp.recommendedImageRectHeight;
-    sfc->swapchain = oxr_create_swapchain(session, sfc->width, sfc->height);
-    sfcArray.push_back(sfc);
-  }
-  return sfcArray;
-}
-
 /* ------------------------------------------------------------------------------------
  * * RenderFrame (Frame/Layer/View)
  * ------------------------------------------------------------------------------------
@@ -444,6 +365,84 @@ struct XrAppImpl {
     return true;
   }
 
+  /* ----------------------------------------------------------------------------
+   * * Swapchain operation
+   * ----------------------------------------------------------------------------
+   * *
+   *
+   *  --+-- view[0] -- viewSurface[0]
+   *    |
+   *    +-- view[1] -- viewSurface[1]
+   *                   +----------------------------------------------+
+   *                   | uint32_t    width, height                    |
+   *                   | XrSwapchain swapchain                        |
+   *                   | rtarget_array[0]: (fbo_id, texc_id, texz_id) |
+   *                   | rtarget_array[1]: (fbo_id, texc_id, texz_id) |
+   *                   | rtarget_array[2]: (fbo_id, texc_id, texz_id) |
+   *                   +----------------------------------------------+
+   *
+   * ----------------------------------------------------------------------------
+   */
+  bool oxr_create_viewsurface() {
+    uint32_t numConf;
+    XrViewConfigurationType viewType =
+        XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    if (XR_FAILED(xrEnumerateViewConfigurationViews(
+            m_instance, m_systemId, viewType, 0, &numConf, NULL))) {
+      return false;
+    }
+
+    std::vector<XrViewConfigurationView> conf(numConf);
+    for (uint32_t i = 0; i < numConf; i++) {
+      conf[i].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+    }
+    if (XR_FAILED(xrEnumerateViewConfigurationViews(m_instance, m_systemId,
+                                                    viewType, numConf, &numConf,
+                                                    conf.data()))) {
+      return false;
+    }
+
+    LOGI("ViewConfiguration num: %d", numConf);
+    for (uint32_t i = 0; i < numConf; i++) {
+      XrViewConfigurationView &vp = conf[i];
+      LOGI("ViewConfiguration[%d/%d]: MaxWH(%d, %d), MaxSample(%d)", i, numConf,
+           vp.maxImageRectWidth, vp.maxImageRectHeight,
+           vp.maxSwapchainSampleCount);
+      LOGI("                        RecWH(%d, %d), RecSample(%d)",
+           vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
+           vp.recommendedSwapchainSampleCount);
+    }
+
+    for (uint32_t i = 0; i < numConf; i++) {
+      auto &vp = conf[i];
+      LOGI("Swapchain for view %d: WH(%d, %d), SampleCount=%d", i,
+           vp.recommendedImageRectWidth, vp.recommendedImageRectHeight,
+           vp.recommendedSwapchainSampleCount);
+      auto sfc = std::make_shared<viewsurface>();
+      sfc->width = vp.recommendedImageRectWidth;
+      sfc->height = vp.recommendedImageRectHeight;
+      XrSwapchainCreateInfo ci = {
+          .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+          .usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT |
+                        XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+          .format = GL_RGBA8,
+          .sampleCount = 1,
+          .width = sfc->width,
+          .height = sfc->height,
+          .faceCount = 1,
+          .arraySize = 1,
+          .mipCount = 1,
+      };
+      if (XR_FAILED(xrCreateSwapchain(m_session, &ci, &sfc->swapchain))) {
+        return false;
+      }
+
+      m_viewSurface.push_back(sfc);
+    }
+
+    return true;
+  }
+
   bool CreateSession(int major, int minor) {
     // oxr_confirm_gfx_requirements(m_instance, m_systemId);
     PFN_xrGetOpenGLESGraphicsRequirementsKHR
@@ -507,7 +506,7 @@ struct XrAppImpl {
       xrCreateReferenceSpace(m_session, &ci, &m_stageSpace);
     }
 
-    m_viewSurface = oxr_create_viewsurface(m_instance, m_systemId, m_session);
+    oxr_create_viewsurface();
 
     // create backbuffer
     for (auto &view : m_viewSurface) {
