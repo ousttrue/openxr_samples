@@ -199,7 +199,6 @@ void android_main(struct android_app* app) {
         app->activity->vm->AttachCurrentThread(&Env, nullptr);
 
         AndroidAppState appState = {};
-
         app->userData = &appState;
         app->onAppCmd = app_handle_cmd;
 
