@@ -10,7 +10,7 @@
 
 #ifdef XR_USE_GRAPHICS_API_OPENGL_ES
 
-#include "common/gfxwrapper_opengl.h"
+#include "gfxwrapper_opengl.h"
 #include <common/xr_linear.h>
 
 namespace {

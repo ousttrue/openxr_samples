@@ -9,9 +9,6 @@ get_filename_component(
   OPENXR_SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/../../third_party/OpenXR-SDK
   ABSOLUTE)
 get_filename_component(
-  OPENXR_SDK_SOURCE
-  ${CMAKE_CURRENT_LIST_DIR}/../../third_party/OpenXR-SDK-Source ABSOLUTE)
-get_filename_component(
   MOBILE_SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/../../third_party/OpenXRMobileSDK
   ABSOLUTE)
 
@@ -25,16 +22,6 @@ add_library(${TARGET_NAME} STATIC
             ${ANDROID_NATIVE_APP_GLUE}/android_native_app_glue.c)
 target_include_directories(${TARGET_NAME} PUBLIC ${ANDROID_NATIVE_APP_GLUE})
 target_compile_options(${TARGET_NAME} PRIVATE -Wno-unused-parameter)
-
-#
-# openxr-gfxwrapper
-#
-set(TARGET_NAME openxr-gfxwrapper)
-add_library(${TARGET_NAME} STATIC
-            ${OPENXR_SDK_SOURCE}/src/common/gfxwrapper_opengl.c)
-target_link_libraries(${TARGET_NAME} PRIVATE android_native_app_glue)
-target_include_directories(${TARGET_NAME}
-                           PRIVATE ${OPENXR_SDK_SOURCE}/external/include)
 
 #
 # openxr_loader
