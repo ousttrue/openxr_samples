@@ -37,38 +37,4 @@ set_target_properties(
 )
 # subdirs(${OPENXR_SDK_DIR})
 
-set(HELPER_FOLDER "Helpers")
-function(compile_glsl run_target_name)
-  set(glsl_output_files "")
-  foreach(in_file IN LISTS ARGN)
-    get_filename_component(glsl_stage ${in_file} NAME_WE)
-    set(out_file ${CMAKE_CURRENT_BINARY_DIR}/${glsl_stage}.spv)
-    if(GLSL_COMPILER)
-      # Run glslc if we can find it
-      add_custom_command(
-        OUTPUT ${out_file}
-        COMMAND ${GLSL_COMPILER} -mfmt=c -fshader-stage=${glsl_stage} ${in_file}
-                -o ${out_file}
-        DEPENDS ${in_file})
-    elseif(GLSLANG_VALIDATOR)
-      # Run glslangValidator if we can find it
-      add_custom_command(
-        OUTPUT ${out_file}
-        COMMAND ${GLSLANG_VALIDATOR} -V -S ${glsl_stage} ${in_file} -x -o
-                ${out_file}
-        DEPENDS ${in_file}
-        VERBATIM)
-    else()
-      # Use the precompiled .spv files
-      get_filename_component(glsl_src_dir ${in_file} DIRECTORY)
-      set(precompiled_file ${glsl_src_dir}/${glsl_stage}.spv)
-      configure_file(${precompiled_file} ${out_file} COPYONLY)
-    endif()
-    list(APPEND glsl_output_files ${out_file})
-  endforeach()
-  add_custom_target(${run_target_name} ALL DEPENDS ${glsl_output_files})
-  set_target_properties(${run_target_name} PROPERTIES FOLDER ${HELPER_FOLDER})
-
-endfunction()
-
 subdirs(src/main/cpp)
