@@ -11,7 +11,7 @@
             "program": "${workspaceFolder}/build/hello_xr/app/src/main/cpp/Debug/hello_xr.exe",
             "args": [
                 "-g",
-                "OpenGL",
+                "Vulkan2",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

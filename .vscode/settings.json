@@ -1,19 +1,11 @@
 {
     "cmake.configureSettings": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        // // "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.0.6113669/build/cmake/android.toolchain.cmake",
-        // "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",
-        // "ANDROID": "ON",
-        // "ANDROID_PLATFORM": "android-30",
-        // "ANDROID_ABI": "arm64-v8a",
-        // "CMAKE_ANDROID_ARCH_ABI": "arm64-v8a",
-        // // open_xr
-        // // "ANDROID_STL": "c++_shared",
-        // // "BUILD_LOADER": "ON",
-        // // "BUILD_ALL_EXTENSIONS": "ON",
-        // // "BUILD_API_LAYERS": "OFF",
-        // // "BUILD_TESTS": "OFF",
-        // // "BUILD_CONFORMANCE_TESTS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "${env:ANDROID_HOME}/ndk/21.4.7075529/build/cmake/android.toolchain.cmake",
+        "ANDROID": "ON",
+        "ANDROID_PLATFORM": "android-30",
+        "ANDROID_ABI": "arm64-v8a",
+        "CMAKE_ANDROID_ARCH_ABI": "arm64-v8a",
     },
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/build"

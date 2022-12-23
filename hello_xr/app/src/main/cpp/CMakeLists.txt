@@ -1,3 +1,6 @@
+find_package(Vulkan REQUIRED)
+
+set(VULKAN_SHADERS vulkan_shaders/frag.glsl vulkan_shaders/vert.glsl)
 set(HELPER_FOLDER "Helpers")
 function(compile_glsl run_target_name)
   set(glsl_output_files "")
@@ -42,25 +45,24 @@ if(${ANDROID})
     openxr_program.cpp
     logger.cpp
     platformplugin_factory.cpp
-    # platformplugin_android.cpp
-    platformplugin_win32.cpp
+    platformplugin_android.cpp
     graphicsplugin_factory.cpp
-    # graphicsplugin_opengles.cpp
-    graphicsplugin_opengl.cpp
-    common/gfxwrapper_opengl.c
+    graphicsplugin_vulkan.cpp
     vulkan_shaders/frag.glsl
     vulkan_shaders/vert.glsl)
 
   add_compile_definitions(${TARGET_NAME} PRIVATE XR_USE_PLATFORM_ANDROID
-                          XR_USE_GRAPHICS_API_OPENGL_ES)
+                          XR_USE_GRAPHICS_API_VULKAN)
   target_link_libraries(
     ${TARGET_NAME}
     android
     log
     android_native_app_glue
     openxr_loader
-    GLESv3
-    EGL)
+    # GLESv3
+    # EGL
+    Vulkan::Vulkan
+    )
   target_link_options(${TARGET_NAME} PUBLIC -u ANativeActivity_onCreate)
 else()
   add_executable(
@@ -69,12 +71,9 @@ else()
     openxr_program.cpp
     logger.cpp
     platformplugin_factory.cpp
-    # platformplugin_android.cpp
     platformplugin_win32.cpp
     graphicsplugin_factory.cpp
-    # graphicsplugin_opengles.cpp
-    graphicsplugin_opengl.cpp
-    common/gfxwrapper_opengl.c
+    graphicsplugin_vulkan.cpp
     vulkan_shaders/frag.glsl
     vulkan_shaders/vert.glsl)
 
@@ -96,11 +95,11 @@ else()
                ${OPENXR_SDK_DIR}/native/x64/release/lib/openxr_loader.lib)
 
   add_compile_definitions(${TARGET_NAME} PRIVATE XR_USE_PLATFORM_WIN32
-                          XR_USE_GRAPHICS_API_OPENGL)
-  target_link_libraries(${TARGET_NAME} openxr_loader OPENGL32)
+                          XR_USE_GRAPHICS_API_VULKAN)
+  target_link_libraries(${TARGET_NAME} openxr_loader Vulkan::Vulkan)
 endif()
 
-target_include_directories(${TARGET_NAME} PRIVATE include
+target_include_directories(${TARGET_NAME} PRIVATE include vulkan_shaders
                                                   ${CMAKE_CURRENT_LIST_DIR})
 
 if(GLSLANG_VALIDATOR AND NOT GLSLC_COMMAND)

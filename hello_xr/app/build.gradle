@@ -29,7 +29,8 @@ android {
                     "-DBUILD_TESTS=OFF",
                     "-DBUILD_CONFORMANCE_TESTS=OFF",
                     "-DCMAKE_VERBOSE_MAKEFILE=ON"
-                cppFlags '-DDEFAULT_GRAPHICS_PLUGIN_OPENGLES'
+                // cppFlags '-DDEFAULT_GRAPHICS_PLUGIN_OPENGLES'
+                cppFlags '-DDEFAULT_GRAPHICS_PLUGIN_VULKAN'
                 // targets 'hello_xr', 'openxr_loader'
             }
         }
