@@ -6,10 +6,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 unset(WIN32)
 set(ANDROID TRUE)
 get_filename_component(
-  OPENXR_SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/../../third_party/OpenXR-SDK
+  OPENXR_SDK_DIR ../third_party/OpenXR-SDK
   ABSOLUTE)
 get_filename_component(
-  MOBILE_SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/../../third_party/OpenXRMobileSDK
+  MOBILE_SDK_DIR ../third_party/OpenXRMobileSDK
   ABSOLUTE)
 
 #
@@ -26,7 +26,6 @@ target_compile_options(${TARGET_NAME} PRIVATE -Wno-unused-parameter)
 #
 # openxr_loader
 #
-# include(${CMAKE_CURRENT_LIST_DIR}/../../third_party/openxr.cmake)
 add_library(openxr_loader SHARED IMPORTED)
 set_target_properties(
   openxr_loader
@@ -37,4 +36,4 @@ set_target_properties(
 )
 # subdirs(${OPENXR_SDK_DIR})
 
-subdirs(src/main/cpp)
+subdirs(cpp)
