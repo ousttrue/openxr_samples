@@ -8,7 +8,7 @@
             "name": "hello_xr",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/hello_xr/app/src/main/cpp/Debug/hello_xr.exe",
+            "program": "${workspaceFolder}/prefix/bin/hello_xr.exe",
             "args": [
                 "-g",
                 "Vulkan2",

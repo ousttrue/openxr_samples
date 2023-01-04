@@ -16,3 +16,9 @@ OpenXRMobileSDK
 gradle/
 gradlew
 gradlew.bat
+
+/buildir/
+/subprojects/*
+!/subprojects/*.wrap
+!/subprojects/packagefiles
+/prefix/

@@ -1,0 +1,40 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "configure",
+            "type": "shell",
+            "command": "meson setup builddir --prefix ${workspaceFolder}/prefix",
+            "problemMatcher": [],
+        },
+        {
+            "label": "configure(wipe)",
+            "type": "shell",
+            "command": "meson setup --wipe builddir --prefix ${workspaceFolder}/prefix",
+            "problemMatcher": [],
+        },
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "meson install -C builddir",
+            "problemMatcher": {
+                "owner": "meson-msvc",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}/builddir",
+                ],
+                "pattern": {
+                    "kind": "location",
+                    "regexp": "^(.*)\\((\\d+)\\): (\\w+) (\\w+): (.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "code": 4,
+                    "message": 5,
+                }
+            },
+        },
+    ]
+}

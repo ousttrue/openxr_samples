@@ -1,0 +1,10 @@
+[wrap-file]
+directory = openxr_loader
+source_url = https://github.com/KhronosGroup/OpenXR-SDK/releases/download/release-1.0.26/OpenXR.Loader.1.0.26.nupkg
+source_filename = OpenXR.Loader.1.0.26.zip
+source_hash = ae874fd20e77abc2de4bc8a75ccc9a1217799a6e81cf76eee6a1cd599de45a93
+patch_directory = openxr_loader
+lead_directory_missing = true
+
+[provide]
+openxr_loader = openxr_loader_dep

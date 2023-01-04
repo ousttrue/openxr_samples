@@ -1,0 +1,8 @@
+[wrap-git]
+url = https://github.com/KhronosGroup/OpenXR-SDK-Source
+revision = release-1.0.26
+depth = 1
+patch_directory = openxr_sdk
+
+[provide]
+openxr_common = openxr_common_dep

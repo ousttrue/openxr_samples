@@ -1,5 +1,10 @@
 # openxr_samples
 
+## build
+
+- APK 各フォルダを root する gradle でビルドする
+- PC 版を meson でビルドする
+
 ## native_activity
 
 copy from https://github.com/android/ndk-samples/tree/main/native-activity
