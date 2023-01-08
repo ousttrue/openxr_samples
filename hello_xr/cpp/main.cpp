@@ -220,7 +220,7 @@ void android_main(struct android_app* app) {
         std::shared_ptr<IGraphicsPlugin> graphicsPlugin = CreateGraphicsPlugin(options, platformPlugin);
 
         // Initialize the OpenXR program.
-        std::shared_ptr<IOpenXrProgram> program = CreateOpenXrProgram(options, platformPlugin, graphicsPlugin);
+        std::shared_ptr<OpenXrProgram> program = CreateOpenXrProgram(options, platformPlugin, graphicsPlugin);
 
         // Initialize the loader for this platform
         PFN_xrInitializeLoaderKHR initializeLoader = nullptr;
@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
             std::shared_ptr<IGraphicsPlugin> graphicsPlugin = CreateGraphicsPlugin(options, platformPlugin);
 
             // Initialize the OpenXR program.
-            std::shared_ptr<IOpenXrProgram> program = CreateOpenXrProgram(options, platformPlugin, graphicsPlugin);
+            std::shared_ptr<OpenXrProgram> program = CreateOpenXrProgram(options, platformPlugin, graphicsPlugin);
 
             program->CreateInstance();
             program->InitializeSystem();
